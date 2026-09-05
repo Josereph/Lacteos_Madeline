@@ -46,4 +46,24 @@ public static class Validaciones
 
         return (true, string.Empty);
     }
+
+    public static (bool EsValido, string Mensaje) ValidarMonto(decimal monto)
+    {
+        if (monto <= 0)
+        {
+            return (false, "El monto debe ser mayor que cero.");
+        }
+
+        return (true, string.Empty);
+    }
+
+    public static (bool EsValido, string Mensaje) ValidarCosto(decimal costo)
+    {
+        if (costo < 0)
+        {
+            return (false, "El costo no puede ser negativo.");
+        }
+
+        return (true, string.Empty);
+    }
 }
