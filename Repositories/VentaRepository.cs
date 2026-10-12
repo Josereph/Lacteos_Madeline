@@ -125,6 +125,32 @@ public class VentaRepository
         return venta;
     }
 
+    /// <summary>
+    /// Ventas del rango de fechas (días completos), más recientes primero.
+    /// Usa el índice IX_Ventas_FechaHora: no recorre todo el historial.
+    /// </summary>
+    public List<Venta> ObtenerPorRango(DateTime? desde, DateTime? hasta)
+    {
+        var ventas = new List<Venta>();
+
+        using var connection = DatabaseConnection.CreateConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT {ColumnasVenta} FROM Ventas
+            WHERE FechaHora BETWEEN $desde AND $hasta
+            ORDER BY FechaHora DESC, IdVenta DESC;
+            """;
+        RangoFechas.AgregarParametros(command, desde, hasta);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            ventas.Add(MapearVenta(reader));
+        }
+
+        return ventas;
+    }
+
     public List<Venta> ObtenerHistorial()
     {
         var ventas = new List<Venta>();

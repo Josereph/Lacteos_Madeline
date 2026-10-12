@@ -71,6 +71,7 @@ public static class TicketHelper
         }
         catch (Exception ex)
         {
+            LogHelper.Error($"Impresión de ticket, venta #{venta.IdVenta}", ex);
             return (false, ex.Message);
         }
     }

@@ -1,6 +1,7 @@
 using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
+using Microsoft.Data.Sqlite;
 
 namespace LacteosMadeline.Services;
 
@@ -25,16 +26,25 @@ public class CajaService
             return (false, valMonto.Mensaje, null);
         }
 
-        var cajaExistente = _cajaRepository.ObtenerCajaAbierta();
-        if (cajaExistente is not null)
+        try
+        {
+            if (_cajaRepository.ObtenerCajaAbierta() is not null)
+            {
+                return (false, "Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.", null);
+            }
+
+            var idCaja = _cajaRepository.AbrirCaja(Redondear(montoInicial));
+            return (true, "Caja abierta correctamente.", _cajaRepository.ObtenerPorId(idCaja));
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // UX_Cajas_UnaAbierta
         {
             return (false, "Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.", null);
         }
-
-        var idCaja = _cajaRepository.AbrirCaja(montoInicial);
-        var caja = _cajaRepository.ObtenerPorId(idCaja);
-
-        return (true, "Caja abierta correctamente.", caja);
+        catch (Exception ex)
+        {
+            LogHelper.Error("Apertura de caja", ex);
+            return (false, $"No se pudo abrir la caja: {ex.Message}", null);
+        }
     }
 
     public Caja? ObtenerCajaAbierta()
@@ -55,31 +65,35 @@ public class CajaService
             return (false, "El tipo de movimiento debe ser 'Entrada' o 'Salida'.");
         }
 
-        var caja = _cajaRepository.ObtenerPorId(idCaja);
-        if (caja is null || caja.Estado != "Abierta")
+        if (Redondear(monto) != monto)
         {
-            return (false, "No se encontró una caja abierta para registrar el movimiento.");
+            return (false, "El monto no puede tener más de dos decimales.");
         }
 
-        if (tipo == "Salida")
+        try
         {
-            var saldoActual = ObtenerResumen(idCaja).SaldoEsperado;
-            if (monto > saldoActual)
+            // El repositorio valida caja abierta y efectivo suficiente
+            // dentro de la misma transacción que inserta el movimiento.
+            _cajaRepository.RegistrarMovimiento(new MovimientoCaja
             {
-                return (false, $"La salida ({monto:C2}) supera el efectivo disponible en caja ({saldoActual:C2}).");
-            }
+                IdCaja      = idCaja,
+                FechaHora   = DateTime.Now,
+                Tipo        = tipo,
+                Monto       = monto,
+                Descripcion = string.IsNullOrWhiteSpace(descripcion) ? null : descripcion.Trim()
+            });
+
+            return (true, "Movimiento registrado correctamente.");
         }
-
-        _cajaRepository.RegistrarMovimiento(new MovimientoCaja
+        catch (InvalidOperationException ex)
         {
-            IdCaja      = idCaja,
-            FechaHora   = DateTime.Now,
-            Tipo        = tipo,
-            Monto       = monto,
-            Descripcion = descripcion
-        });
-
-        return (true, "Movimiento registrado correctamente.");
+            return (false, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error($"Movimiento de caja #{idCaja} ({tipo} {monto})", ex);
+            return (false, $"No se pudo registrar el movimiento: {ex.Message}");
+        }
     }
 
     public ResumenCaja ObtenerResumen(int idCaja)
@@ -87,58 +101,63 @@ public class CajaService
         var caja = _cajaRepository.ObtenerPorId(idCaja)
             ?? throw new InvalidOperationException("Caja no encontrada.");
 
-        var movimientos = _cajaRepository.ObtenerMovimientos(idCaja);
-
-        // Solo las ventas en efectivo suman al dinero físico de la caja;
-        // tarjeta y transferencia se informan aparte.
-        var (ventasEfectivo, ventasOtrosMetodos) = _cajaRepository.ObtenerTotalesVentas(idCaja);
-
-        var totalEntradas = movimientos
-            .Where(m => m.Tipo == "Entrada")
-            .Sum(m => m.Monto);
-
-        var totalSalidas = movimientos
-            .Where(m => m.Tipo == "Salida")
-            .Sum(m => m.Monto);
-
-        var saldoEsperado = caja.MontoInicial + ventasEfectivo + totalEntradas - totalSalidas;
+        var totales = _cajaRepository.ObtenerTotales(idCaja)!;
 
         return new ResumenCaja
         {
-            Caja           = caja,
-            VentasEfectivo = ventasEfectivo,
-            VentasOtrosMetodos = ventasOtrosMetodos,
-            TotalEntradas  = totalEntradas,
-            TotalSalidas   = totalSalidas,
-            SaldoEsperado  = saldoEsperado,
-            Movimientos    = movimientos
+            Caja               = caja,
+            VentasEfectivo     = totales.VentasEfectivo,
+            VentasOtrosMetodos = totales.VentasOtrosMetodos,
+            TotalEntradas      = totales.Entradas,
+            TotalSalidas       = totales.Salidas,
+            SaldoEsperado      = totales.SaldoEsperado,
+            Movimientos        = _cajaRepository.ObtenerMovimientos(idCaja)
         };
     }
 
+    /// <summary>
+    /// Cierra la caja: el saldo esperado se recalcula y se guarda junto con
+    /// el monto contado y la diferencia en una sola transacción. Después se
+    /// genera un respaldo automático de la base de datos; si el respaldo
+    /// falla, el cierre sigue siendo válido y se informa el problema.
+    /// </summary>
     public (bool Exitoso, string Mensaje, ResumenCaja? Resumen) CerrarCaja(int idCaja, decimal montoFinal)
     {
-        if (montoFinal < 0)
+        var valMonto = Validaciones.ValidarMontoNoNegativo(montoFinal);
+        if (!valMonto.EsValido)
         {
-            return (false, "El monto final no puede ser negativo.", null);
+            return (false, "El monto contado no puede ser negativo.", null);
         }
 
-        var caja = _cajaRepository.ObtenerPorId(idCaja);
-        if (caja is null)
-        {
-            return (false, "No se encontró la caja indicada.", null);
-        }
+        montoFinal = Redondear(montoFinal);
 
-        if (caja.Estado != "Abierta")
+        try
         {
-            return (false, "La caja ya se encuentra cerrada.", null);
+            _cajaRepository.CerrarCaja(idCaja, montoFinal);
         }
-
-        _cajaRepository.CerrarCaja(idCaja, montoFinal);
+        catch (InvalidOperationException ex)
+        {
+            return (false, ex.Message, null);
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error($"Cierre de caja #{idCaja}", ex);
+            return (false, $"No se pudo cerrar la caja. No se guardó ningún cambio.\nDetalle: {ex.Message}", null);
+        }
 
         var resumen = ObtenerResumen(idCaja);
+        LogHelper.Info("Cierre de caja",
+            $"Caja #{idCaja}: esperado {resumen.SaldoEsperado:F2}, contado {montoFinal:F2}, diferencia {resumen.Caja.Diferencia:F2}");
 
-        return (true, "Caja cerrada correctamente.", resumen);
+        var respaldo = BackupHelper.RealizarBackupAutomatico($"cierre-caja-{idCaja}");
+        var mensaje = respaldo.Exitoso
+            ? "Caja cerrada correctamente. Respaldo automático generado."
+            : "Caja cerrada correctamente, pero NO se pudo generar el respaldo automático. Haga un respaldo manual.";
+
+        return (true, mensaje, resumen);
     }
+
+    private static decimal Redondear(decimal valor) => Math.Round(valor, 2, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>

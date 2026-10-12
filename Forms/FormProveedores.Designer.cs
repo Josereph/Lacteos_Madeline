@@ -78,7 +78,7 @@ partial class FormProveedores
 
         // dgvProveedores
         dgvProveedores.Location = new Point(12, 85);
-        dgvProveedores.Size = new Size(560, 220);
+        dgvProveedores.Size = new Size(560, 345);
         dgvProveedores.ReadOnly = true;
         dgvProveedores.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         dgvProveedores.MultiSelect = false;
@@ -119,31 +119,31 @@ partial class FormProveedores
 
         // btnNuevo
         btnNuevo.Location = new Point(px, py + 10);
-        btnNuevo.Size = new Size(110, 30);
+        btnNuevo.Size = new Size(115, 34);
         btnNuevo.Text = "Nuevo";
         btnNuevo.Click += btnNuevo_Click;
 
         // btnGuardar
         btnGuardar.Location = new Point(px + 125, py + 10);
-        btnGuardar.Size = new Size(110, 30);
+        btnGuardar.Size = new Size(115, 34);
         btnGuardar.Text = "Guardar";
         btnGuardar.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         btnGuardar.Click += btnGuardar_Click;
 
         // btnActivarDesactivar
-        btnActivarDesactivar.Location = new Point(px, py + 50);
-        btnActivarDesactivar.Size = new Size(240, 30);
+        btnActivarDesactivar.Location = new Point(px, py + 52);
+        btnActivarDesactivar.Size = new Size(240, 34);
         btnActivarDesactivar.Text = "Activar / Desactivar";
         btnActivarDesactivar.Click += btnActivarDesactivar_Click;
 
         // lblMensaje
-        lblMensaje.Location = new Point(12, 315);
+        lblMensaje.Location = new Point(12, 440);
         lblMensaje.Size = new Size(560, 20);
         lblMensaje.AutoSize = false;
 
         // Form
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(850, 350);
+        ClientSize = new Size(850, 472);
         Text = "Lácteos Madeline – Proveedores";
         StartPosition = FormStartPosition.CenterParent;
 

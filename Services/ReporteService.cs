@@ -1,4 +1,5 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 using Microsoft.Data.Sqlite;
@@ -14,6 +15,7 @@ public class ReporteService
 {
     private readonly VentaRepository _ventaRepository = new();
     private readonly CompraRepository _compraRepository = new();
+    private readonly MermaRepository _mermaRepository = new();
     private readonly InventarioService _inventarioService = new();
     private readonly CajaService _cajaService = new();
 
@@ -44,12 +46,10 @@ public class ReporteService
         using var command = connection.CreateCommand();
         command.CommandText = $"""
             SELECT {VentaRepository.ColumnasVenta} FROM Ventas
-            WHERE ($desde IS NULL OR FechaHora >= $desde)
-              AND ($hasta IS NULL OR FechaHora <= $hasta)
-            ORDER BY IdVenta;
+            WHERE FechaHora BETWEEN $desde AND $hasta
+            ORDER BY FechaHora, IdVenta;
             """;
-        command.Parameters.AddWithValue("$desde", (object?)desde?.ToString("yyyy-MM-dd") ?? DBNull.Value);
-        command.Parameters.AddWithValue("$hasta", (object?)hasta?.ToString("yyyy-MM-dd 23:59:59") ?? DBNull.Value);
+        RangoFechas.AgregarParametros(command, desde, hasta);
 
         var ventas = new List<Venta>();
         using var reader = command.ExecuteReader();
@@ -66,27 +66,36 @@ public class ReporteService
     /// Productos ordenados por unidades vendidas en el rango de fechas.
     /// Se agrupa por IdProducto y se muestra el nombre actual del producto
     /// (o el histórico si ya no existe en el catálogo).
+    /// Plan de ejecución: primero se ubican las ventas del rango con
+    /// IX_Ventas_FechaHora, luego su detalle con IX_DetalleVentas_Venta y
+    /// recién al final se agrupa; nunca se recorre todo DetalleVentas.
     /// </summary>
     public List<FilaProductoVendido> ProductosMasVendidos(DateTime? desde = null, DateTime? hasta = null)
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT COALESCE(p.Nombre, MAX(d.NombreProducto)),
-                   SUM(d.Cantidad),
-                   SUM(d.Subtotal),
-                   COUNT(DISTINCT d.IdVenta),
-                   p.Existencia
-            FROM DetalleVentas d
-            INNER JOIN Ventas v ON v.IdVenta = d.IdVenta
-            LEFT JOIN Productos p ON p.IdProducto = d.IdProducto
-            WHERE ($desde IS NULL OR v.FechaHora >= $desde)
-              AND ($hasta IS NULL OR v.FechaHora <= $hasta)
-            GROUP BY d.IdProducto
-            ORDER BY SUM(d.Cantidad) DESC, SUM(d.Subtotal) DESC;
+            WITH VentasRango AS (
+                SELECT IdVenta FROM Ventas
+                WHERE FechaHora BETWEEN $desde AND $hasta
+            ),
+            Vendidos AS (
+                SELECT d.IdProducto,
+                       MAX(d.NombreProducto)     AS NombreHistorico,
+                       SUM(d.Cantidad)           AS Unidades,
+                       ROUND(SUM(d.Subtotal), 2) AS Importe,
+                       COUNT(DISTINCT d.IdVenta) AS NumVentas
+                FROM VentasRango v
+                INNER JOIN DetalleVentas d ON d.IdVenta = v.IdVenta
+                GROUP BY d.IdProducto
+            )
+            SELECT COALESCE(p.Nombre, x.NombreHistorico),
+                   x.Unidades, x.Importe, x.NumVentas, p.Existencia
+            FROM Vendidos x
+            LEFT JOIN Productos p ON p.IdProducto = x.IdProducto
+            ORDER BY x.Unidades DESC, x.Importe DESC;
             """;
-        command.Parameters.AddWithValue("$desde", (object?)desde?.ToString("yyyy-MM-dd") ?? DBNull.Value);
-        command.Parameters.AddWithValue("$hasta", (object?)hasta?.ToString("yyyy-MM-dd 23:59:59") ?? DBNull.Value);
+        RangoFechas.AgregarParametros(command, desde, hasta);
 
         var filas = new List<FilaProductoVendido>();
         using var reader = command.ExecuteReader();
@@ -104,6 +113,17 @@ public class ReporteService
             });
         }
         return filas;
+    }
+
+    // ─── Mermas ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Bajas por caducidad/daño del período. No forman parte del reporte
+    /// de ventas ni del arqueo de caja.
+    /// </summary>
+    public List<Merma> ReporteMermas(DateTime? desde = null, DateTime? hasta = null)
+    {
+        return _mermaRepository.ObtenerPorRango(desde, hasta);
     }
 
     // ─── Reporte de compras ───────────────────────────────────────────────
@@ -133,8 +153,9 @@ public class ReporteService
         {
             return _cajaService.ObtenerResumen(idCaja);
         }
-        catch
+        catch (Exception ex)
         {
+            LogHelper.Error($"Resumen de caja #{idCaja} para reportes", ex);
             return null;
         }
     }

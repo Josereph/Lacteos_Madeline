@@ -26,7 +26,7 @@ public class FormInputMonto : Form
         _totalAPagar = totalAPagar;
 
         Text = titulo;
-        ClientSize = new Size(340, totalAPagar is null ? 130 : 165);
+        ClientSize = new Size(340, totalAPagar is null ? 140 : 178);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -35,34 +35,34 @@ public class FormInputMonto : Form
         _lblMensaje = new Label
         {
             Text = mensaje,
-            Location = new Point(12, 10),
-            Size = new Size(315, 30),
+            Location = new Point(12, 8),
+            Size = new Size(315, 40),
             AutoSize = false
         };
 
         _txtMonto = new TextBox
         {
-            Location = new Point(12, 42),
+            Location = new Point(12, 52),
             Size = new Size(315, 23),
             Text = valorInicial.ToString("F2")
         };
 
         _lblCambio = new Label
         {
-            Location = new Point(12, 72),
+            Location = new Point(12, 90),
             Size = new Size(315, 28),
             AutoSize = false,
             Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             Visible = totalAPagar is not null
         };
 
-        var filaBotones = totalAPagar is null ? 78 : 115;
+        var filaBotones = totalAPagar is null ? 94 : 130;
 
         _btnAceptar = new Button
         {
             Text = "Aceptar",
             Location = new Point(150, filaBotones),
-            Size = new Size(85, 30),
+            Size = new Size(85, 34),
             DialogResult = DialogResult.OK
         };
         _btnAceptar.Click += BtnAceptar_Click;
@@ -71,7 +71,7 @@ public class FormInputMonto : Form
         {
             Text = "Cancelar",
             Location = new Point(242, filaBotones),
-            Size = new Size(85, 30),
+            Size = new Size(85, 34),
             DialogResult = DialogResult.Cancel
         };
 
@@ -79,6 +79,12 @@ public class FormInputMonto : Form
         CancelButton = _btnCancelar;
 
         Controls.AddRange(new Control[] { _lblMensaje, _txtMonto, _lblCambio, _btnAceptar, _btnCancelar });
+
+        Tema.Aplicar(this);
+        Tema.EstilizarBoton(_btnAceptar, Tema.RolBoton.Primario);
+        Tema.EstilizarBoton(_btnCancelar, Tema.RolBoton.Peligro);
+        _txtMonto.Font = new Font(Tema.Familia, 12F);
+        _lblCambio.Font = new Font(Tema.Familia, 12F, FontStyle.Bold);
 
         _txtMonto.TextChanged += (_, _) => ActualizarCambio();
         Shown += (_, _) => { _txtMonto.Focus(); _txtMonto.SelectAll(); };
@@ -91,17 +97,17 @@ public class FormInputMonto : Form
 
         if (!decimal.TryParse(_txtMonto.Text.Trim(), out var recibido))
         {
-            _lblCambio.ForeColor = Color.DarkRed;
+            _lblCambio.ForeColor = Tema.Alerta;
             _lblCambio.Text = "Monto no válido";
         }
         else if (recibido < total)
         {
-            _lblCambio.ForeColor = Color.DarkRed;
+            _lblCambio.ForeColor = Tema.Alerta;
             _lblCambio.Text = $"Faltan: {total - recibido:C2}";
         }
         else
         {
-            _lblCambio.ForeColor = Color.DarkGreen;
+            _lblCambio.ForeColor = Tema.Exito;
             _lblCambio.Text = $"Cambio: {recibido - total:C2}";
         }
     }

@@ -13,6 +13,8 @@ namespace LacteosMadeline.Repositories;
 /// </summary>
 public class CompraRepository
 {
+    private readonly ProductoRepository _productoRepository = new();
+
     public int RegistrarCompraCompleta(Compra compra)
     {
         using var connection = DatabaseConnection.CreateConnection();
@@ -25,7 +27,7 @@ public class CompraRepository
             foreach (var detalle in compra.Detalles)
             {
                 InsertarDetalle(connection, transaction, idCompra, detalle);
-                AumentarExistencia(connection, transaction, detalle.IdProducto, detalle.Cantidad);
+                _productoRepository.AumentarExistencia(connection, transaction, detalle.IdProducto, detalle.Cantidad);
             }
 
             transaction.Commit();
@@ -68,24 +70,6 @@ public class CompraRepository
         command.Parameters.AddWithValue("$cantidad", detalle.Cantidad);
         command.Parameters.AddWithValue("$costoUnitario", detalle.CostoUnitario);
         command.Parameters.AddWithValue("$subtotal", detalle.Subtotal);
-        command.ExecuteNonQuery();
-    }
-
-    /// <summary>
-    /// Aumenta la existencia del producto dentro de la transacción activa.
-    /// Es la operación inversa a DescontarExistencia en ProductoRepository.
-    /// </summary>
-    private static void AumentarExistencia(SqliteConnection connection, SqliteTransaction transaction, int idProducto, int cantidad)
-    {
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE Productos
-            SET Existencia = Existencia + $cantidad
-            WHERE IdProducto = $id;
-            """;
-        command.Parameters.AddWithValue("$cantidad", cantidad);
-        command.Parameters.AddWithValue("$id", idProducto);
         command.ExecuteNonQuery();
     }
 
@@ -158,12 +142,10 @@ public class CompraRepository
             SELECT c.IdCompra, c.FechaHora, c.IdProveedor, p.Nombre, c.Total
             FROM Compras c
             INNER JOIN Proveedores p ON p.IdProveedor = c.IdProveedor
-            WHERE ($desde IS NULL OR c.FechaHora >= $desde)
-              AND ($hasta IS NULL OR c.FechaHora <= $hasta)
+            WHERE c.FechaHora BETWEEN $desde AND $hasta
             ORDER BY c.IdCompra DESC;
             """;
-        command.Parameters.AddWithValue("$desde", (object?)desde?.ToString("yyyy-MM-dd") ?? DBNull.Value);
-        command.Parameters.AddWithValue("$hasta", (object?)hasta?.ToString("yyyy-MM-dd 23:59:59") ?? DBNull.Value);
+        RangoFechas.AgregarParametros(command, desde, hasta);
 
         using var reader = command.ExecuteReader();
         while (reader.Read())

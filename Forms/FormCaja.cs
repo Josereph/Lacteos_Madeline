@@ -1,6 +1,8 @@
 using LacteosMadeline.Repositories;
 using LacteosMadeline.Services;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -17,6 +19,8 @@ public partial class FormCaja : Form
     public FormCaja()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormCaja_Load;
     }
 
@@ -38,7 +42,7 @@ public partial class FormCaja : Form
             MostrarPanelApertura(visible: true);
             MostrarPanelOperaciones(visible: false);
             lblEstado.Text = "Estado: Sin caja abierta";
-            lblEstado.ForeColor = Color.Gray;
+            lblEstado.ForeColor = Tema.GrisCalido;
         }
         else
         {
@@ -46,7 +50,7 @@ public partial class FormCaja : Form
             MostrarPanelApertura(visible: false);
             MostrarPanelOperaciones(visible: true);
             lblEstado.Text = $"Caja #{cajaAbierta.IdCaja} abierta desde {cajaAbierta.FechaApertura:dd/MM/yyyy HH:mm}";
-            lblEstado.ForeColor = Color.DarkGreen;
+            lblEstado.ForeColor = Tema.Exito;
             ActualizarResumen();
         }
     }
@@ -143,18 +147,17 @@ public partial class FormCaja : Form
             var icono = diferencia == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning;
 
             MessageBox.Show(
-                $"RESUMEN DE CIERRE – Caja #{r.Caja.IdCaja}\n" +
-                $"────────────────────────────────\n" +
-                $"Monto inicial:        {r.Caja.MontoInicial:C2}\n" +
-                $"Ventas en efectivo:  +{r.VentasEfectivo:C2}\n" +
-                $"Entradas manuales:   +{r.TotalEntradas:C2}\n" +
-                $"Salidas manuales:    -{r.TotalSalidas:C2}\n" +
-                $"────────────────────────────────\n" +
-                $"Saldo esperado:       {r.SaldoEsperado:C2}\n" +
-                $"Monto contado:        {montoFinal:C2}\n" +
-                $"Diferencia:           {diferencia:C2}\n\n" +
-                $"Ventas tarjeta/transferencia (no están en caja): {r.VentasOtrosMetodos:C2}\n" +
-                $"Total vendido en la jornada: {r.TotalVentas:C2}",
+                $"Resumen de cierre de la caja N.º {r.Caja.IdCaja}\n\n" +
+                $"Fondo inicial: {r.Caja.MontoInicial:C2}\n" +
+                $"Ventas en efectivo: {r.VentasEfectivo:C2}\n" +
+                $"Entradas manuales: {r.TotalEntradas:C2}\n" +
+                $"Salidas manuales: {r.TotalSalidas:C2}\n\n" +
+                $"Efectivo esperado: {r.SaldoEsperado:C2}\n" +
+                $"Efectivo contado: {montoFinal:C2}\n" +
+                $"Diferencia: {diferencia:C2}\n\n" +
+                $"Ventas con tarjeta o transferencia (no están en caja): {r.VentasOtrosMetodos:C2}\n" +
+                $"Total vendido en la jornada: {r.TotalVentas:C2}\n\n" +
+                resultado.Mensaje,
                 "Caja cerrada",
                 MessageBoxButtons.OK,
                 icono);
@@ -172,12 +175,12 @@ public partial class FormCaja : Form
 
         var resumen = _cajaService.ObtenerResumen(_idCajaActual);
 
-        lblMontoInicial.Text  = $"Monto inicial:        {resumen.Caja.MontoInicial:C2}";
-        lblVentas.Text        = $"Ventas efectivo:     +{resumen.VentasEfectivo:C2}";
+        lblMontoInicial.Text  = $"{resumen.Caja.MontoInicial:C2}";
+        lblVentas.Text        = $"{resumen.VentasEfectivo:C2}";
         lblVentasOtros.Text   = $"Tarjeta / transferencia: {resumen.VentasOtrosMetodos:C2}\n(no suma al efectivo)\nTotal vendido: {resumen.TotalVentas:C2}";
-        lblEntradas.Text      = $"Entradas:            +{resumen.TotalEntradas:C2}";
-        lblSalidas.Text       = $"Salidas:             -{resumen.TotalSalidas:C2}";
-        lblSaldoEsperado.Text = $"Saldo esperado:       {resumen.SaldoEsperado:C2}";
+        lblEntradas.Text      = $"{resumen.TotalEntradas:C2}";
+        lblSalidas.Text       = $"{resumen.TotalSalidas:C2}";
+        lblSaldoEsperado.Text = $"{resumen.SaldoEsperado:C2}";
 
         dgvMovimientos.DataSource = null;
         dgvMovimientos.DataSource = resumen.Movimientos;
@@ -208,9 +211,17 @@ public partial class FormCaja : Form
             dgvHistorial.Columns["FechaApertura"].HeaderText = "Apertura";
             dgvHistorial.Columns["MontoInicial"].HeaderText = "Monto Inicial";
             dgvHistorial.Columns["FechaCierre"].HeaderText = "Cierre";
-            dgvHistorial.Columns["MontoFinal"].HeaderText = "Monto Final";
+            dgvHistorial.Columns["MontoFinal"].HeaderText = "Monto Contado";
+            dgvHistorial.Columns["MontoEsperado"].HeaderText = "Monto Esperado";
+            dgvHistorial.Columns["Diferencia"].HeaderText = "Diferencia";
             dgvHistorial.Columns["Estado"].HeaderText = "Estado";
-            dgvHistorial.Columns["Movimientos"].Visible = false;
+        }
+
+        // La lista de movimientos no se muestra en el historial; según el
+        // enlace de datos la columna puede no generarse, por eso se verifica.
+        if (dgvHistorial.Columns["Movimientos"] is { } columnaMovimientos)
+        {
+            columnaMovimientos.Visible = false;
         }
     }
 
@@ -221,7 +232,37 @@ public partial class FormCaja : Form
 
     private void MostrarMensaje(string mensaje, bool esError = true)
     {
-        lblMensaje.ForeColor = esError ? Color.DarkRed : Color.DarkGreen;
+        lblMensaje.ForeColor = esError ? Tema.Alerta : Tema.Exito;
         lblMensaje.Text = mensaje;
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        // Primero los anclajes dentro de cada grupo, mientras los grupos
+        // conservan su tamaño de diseño (el orden importa).
+        Diseno.Anclar(Diseno.ArribaAncho, txtDescripcion);
+        Diseno.Anclar(Diseno.ArribaDerecha, btnRegistrarMovimiento, btnCerrarCaja);
+
+        Diseno.Anclar(Diseno.ArribaAncho, lblEstado);
+        Diseno.Anclar(Diseno.Todo, panelOperaciones);
+        Diseno.Anclar(Diseno.AbajoAncho, lblMensaje);
+        tabCaja.Dock = DockStyle.Fill;
+
+        // Dentro de las pestañas se usa Dock (las páginas aún no tienen su
+        // tamaño real al construir el formulario, así que no sirven anclajes):
+        // movimiento arriba, resumen abajo y la tabla ocupa el resto.
+        tabJornada.Padding = new Padding(8);
+        grpMovimiento.Dock = DockStyle.Top;
+        grpResumen.Dock = DockStyle.Bottom;
+        dgvMovimientos.Dock = DockStyle.Fill;
+        dgvMovimientos.BringToFront();
+
+        tabHistorial.Padding = new Padding(8);
+        dgvHistorial.Dock = DockStyle.Fill;
+
     }
 }

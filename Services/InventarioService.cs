@@ -1,3 +1,4 @@
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 
@@ -18,11 +19,12 @@ public class InventarioService
         return _productoRepository.Buscar(soloActivos: true);
     }
 
+    /// <summary>
+    /// Existencias críticas, filtradas y ordenadas por urgencia en SQL.
+    /// </summary>
     public List<Producto> ConsultarBajoStock()
     {
-        return _productoRepository.Buscar(soloActivos: true)
-            .Where(p => p.Existencia <= p.StockMinimo)
-            .ToList();
+        return _productoRepository.ObtenerBajoStock();
     }
 
     public int ConsultarExistencia(int idProducto)
@@ -36,8 +38,28 @@ public class InventarioService
         return ConsultarExistencia(idProducto) >= cantidad;
     }
 
-    public void AjustarExistencia(int idProducto, int nuevaExistencia)
+    /// <summary>
+    /// Ajuste por conteo físico. Para pérdidas por caducidad o daño use
+    /// MermaService, que deja registro del motivo y del costo.
+    /// </summary>
+    public (bool Exitoso, string Mensaje) AjustarExistencia(int idProducto, int nuevaExistencia)
     {
-        _productoRepository.AjustarExistencia(idProducto, nuevaExistencia);
+        if (nuevaExistencia < 0)
+        {
+            return (false, "La existencia no puede ser negativa.");
+        }
+
+        try
+        {
+            var anterior = ConsultarExistencia(idProducto);
+            _productoRepository.AjustarExistencia(idProducto, nuevaExistencia);
+            LogHelper.Info("Ajuste de inventario", $"Producto #{idProducto}: {anterior} → {nuevaExistencia}");
+            return (true, "Existencia ajustada correctamente.");
+        }
+        catch (Exception ex)
+        {
+            if (ex is not InvalidOperationException) LogHelper.Error($"Ajuste de existencia producto #{idProducto}", ex);
+            return (false, ErroresBaseDatos.MensajeAmigable(ex));
+        }
     }
 }

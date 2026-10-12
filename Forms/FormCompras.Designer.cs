@@ -115,21 +115,21 @@ partial class FormCompras
         btnEliminarLinea.Click += btnEliminarLinea_Click;
 
         // lblTotal
-        lblTotal.Location = new Point(400, 354);
-        lblTotal.Size = new Size(200, 22);
+        lblTotal.Location = new Point(290, 352);
+        lblTotal.Size = new Size(245, 28);
         lblTotal.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
         lblTotal.Text = "Total: $0.00";
         lblTotal.TextAlign = ContentAlignment.MiddleRight;
 
         // Botones confirmar / cancelar
-        btnConfirmar.Location = new Point(555, 350);
-        btnConfirmar.Size = new Size(80, 28);
+        btnConfirmar.Location = new Point(545, 348);
+        btnConfirmar.Size = new Size(100, 34);
         btnConfirmar.Text = "Confirmar";
         btnConfirmar.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         btnConfirmar.Click += btnConfirmar_Click;
 
-        btnCancelar.Location = new Point(645, 350);
-        btnCancelar.Size = new Size(80, 28);
+        btnCancelar.Location = new Point(651, 348);
+        btnCancelar.Size = new Size(90, 34);
         btnCancelar.Text = "Cancelar";
         btnCancelar.Click += btnCancelar_Click;
 

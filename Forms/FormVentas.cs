@@ -16,30 +16,69 @@ public partial class FormVentas : Form
 {
     private readonly VentaService _ventaService = new();
     private readonly ProductoService _productoService = new();
+    private bool _cargado;
 
     public FormVentas()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        lblTotal.ForeColor = Tema.CafeRustico;
         Load += FormVentas_Load;
         KeyDown += FormVentas_KeyDown;
         nudCantidad.KeyDown += nudCantidad_KeyDown;
+        VisibleChanged += FormVentas_VisibleChanged;
     }
+
+    /// <summary>
+    /// Indica si hay productos en el carrito sin cobrar (el shell lo usa
+    /// para advertir antes de cerrar el sistema).
+    /// </summary>
+    public bool TieneVentaEnCurso => _ventaService.Carrito.Count > 0;
+
+    private string MetodoSeleccionado =>
+        rbTarjeta.Checked ? Venta.PagoTarjeta :
+        rbTransferencia.Checked ? Venta.PagoTransferencia :
+        Venta.PagoEfectivo;
 
     private void FormVentas_Load(object? sender, EventArgs e)
     {
-        cboMetodoPago.DataSource = Venta.MetodosPago.ToList();
-        cboMetodoPago.SelectedItem = Venta.PagoEfectivo;
+        rbEfectivo.Checked = true;
 
         _ventaService.IniciarVenta();
         CargarProductos();
         ActualizarCarrito();
-
-        if (!_ventaService.HayCajaAbierta())
-        {
-            MostrarMensaje("Atención: no hay una caja abierta. Abra la caja en el módulo Caja para poder confirmar ventas.");
-        }
+        VerificarCaja();
+        _cargado = true;
 
         cboProducto.Focus();
+    }
+
+    /// <summary>
+    /// El punto de venta se conserva al cambiar de módulo (no se pierde el
+    /// carrito). Al volver, se recargan existencias y estado de caja por si
+    /// cambiaron en Compras, Mermas o Caja.
+    /// </summary>
+    private void FormVentas_VisibleChanged(object? sender, EventArgs e)
+    {
+        if (!_cargado || !Visible) return;
+
+        var seleccionado = cboProducto.SelectedValue;
+        CargarProductos();
+        if (seleccionado is not null) cboProducto.SelectedValue = seleccionado;
+        VerificarCaja();
+        cboProducto.Focus();
+    }
+
+    private void VerificarCaja()
+    {
+        if (!_ventaService.HayCajaAbierta())
+        {
+            MostrarMensaje("Atención: no hay una caja abierta. Abra la caja en Control de Caja para poder cobrar.");
+        }
+        else if (lblMensaje.Text.StartsWith("Atención: no hay una caja abierta"))
+        {
+            MostrarMensaje(string.Empty, esError: false);
+        }
     }
 
     private void FormVentas_KeyDown(object? sender, KeyEventArgs e)
@@ -90,7 +129,7 @@ public partial class FormVentas : Form
         if (resultado.Exitoso)
         {
             nudCantidad.Value = 1;
-            lblCambio.Text = string.Empty;
+            LimpiarCambio();
             ActualizarCarrito();
             cboProducto.Focus();
             cboProducto.SelectAll();
@@ -117,7 +156,7 @@ public partial class FormVentas : Form
             return;
         }
 
-        var metodoPago = cboMetodoPago.SelectedItem as string ?? Venta.PagoEfectivo;
+        var metodoPago = MetodoSeleccionado;
         decimal? montoRecibido = null;
 
         if (metodoPago == Venta.PagoEfectivo)
@@ -149,15 +188,19 @@ public partial class FormVentas : Form
         var venta = resultado.VentaRegistrada;
         MostrarMensaje($"Venta #{venta.IdVenta} registrada correctamente.", esError: false);
 
-        lblCambio.Text = venta.Cambio is decimal cambio
-            ? $"Recibido: {venta.MontoRecibido:C2}   CAMBIO A ENTREGAR: {cambio:C2}"
-            : $"Pagado con {venta.MetodoPago.ToLower()}: {venta.Total:C2}";
+        // Cambio en gran formato para entregarlo sin errores.
+        lblCambio.Text = $"{venta.Cambio ?? 0:C2}";
+        lblCambio.ForeColor = venta.Cambio > 0 ? Tema.Exito : Tema.Carbon;
+        lblRecibido.Text = venta.MontoRecibido is decimal recibido
+            ? $"Venta N.º {venta.IdVenta}  ·  Recibido {recibido:C2}"
+            : $"Venta N.º {venta.IdVenta}  ·  Pagado con {venta.MetodoPago.ToLower()}";
 
         var vistaPrevia = TicketHelper.GenerarTexto(venta);
         var confirmarImpresion = MessageBox.Show(
             $"{vistaPrevia}\n¿Desea imprimir el ticket?",
             "Venta registrada",
-            MessageBoxButtons.YesNo);
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
 
         if (confirmarImpresion == DialogResult.Yes)
         {
@@ -173,7 +216,7 @@ public partial class FormVentas : Form
 
         CargarProductos();
         ActualizarCarrito();
-        cboMetodoPago.SelectedItem = Venta.PagoEfectivo;
+        rbEfectivo.Checked = true;
         cboProducto.Focus();
     }
 
@@ -181,7 +224,7 @@ public partial class FormVentas : Form
     {
         _ventaService.IniciarVenta();
         ActualizarCarrito();
-        lblCambio.Text = string.Empty;
+        LimpiarCambio();
         MostrarMensaje("Venta cancelada.", esError: false);
     }
 
@@ -203,12 +246,25 @@ public partial class FormVentas : Form
             dgvCarrito.Columns["Subtotal"].DefaultCellStyle.Format = "C2";
         }
 
-        lblTotal.Text = $"Total: {_ventaService.Total:C2}";
+        lblTotal.Text = $"{_ventaService.Total:C2}";
+
+        var lineas = _ventaService.Carrito.Count;
+        var unidades = _ventaService.Carrito.Sum(d => d.Cantidad);
+        lblDesglose.Text = lineas == 0
+            ? "Sin productos"
+            : $"{lineas} {(lineas == 1 ? "producto" : "productos")}  ·  {unidades} {(unidades == 1 ? "unidad" : "unidades")}";
+    }
+
+    private void LimpiarCambio()
+    {
+        lblCambio.Text = $"{0m:C2}";
+        lblCambio.ForeColor = Tema.GrisCalido;
+        lblRecibido.Text = string.Empty;
     }
 
     private void MostrarMensaje(string mensaje, bool esError = true)
     {
-        lblMensaje.ForeColor = esError ? Color.DarkRed : Color.DarkGreen;
+        lblMensaje.ForeColor = esError ? Tema.Alerta : Tema.Exito;
         lblMensaje.Text = mensaje;
     }
 }

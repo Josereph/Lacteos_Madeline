@@ -1,6 +1,8 @@
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -17,6 +19,8 @@ public partial class FormProveedores : Form
     public FormProveedores()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormProveedores_Load;
     }
 
@@ -134,7 +138,21 @@ public partial class FormProveedores : Form
 
     private void MostrarMensaje(string mensaje, bool esError = true)
     {
-        lblMensaje.ForeColor = esError ? Color.DarkRed : Color.DarkGreen;
+        lblMensaje.ForeColor = esError ? Tema.Alerta : Tema.Exito;
         lblMensaje.Text = mensaje;
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        Diseno.Anclar(Diseno.Todo, dgvProveedores);
+        Diseno.Anclar(Diseno.ArribaDerecha,
+            lblNombre, txtNombre, lblContacto, txtContacto, lblTelefono, txtTelefono,
+            lblDireccion, txtDireccion, lblObservaciones, txtObservaciones,
+            btnNuevo, btnGuardar, btnActivarDesactivar);
+        Diseno.Anclar(Diseno.AbajoAncho, lblMensaje);
     }
 }

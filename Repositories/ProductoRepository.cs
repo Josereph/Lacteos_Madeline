@@ -125,14 +125,76 @@ public class ProductoRepository
         }
     }
 
+    /// <summary>
+    /// Aumenta existencia dentro de una transacción ya abierta (compras).
+    /// Falla si el producto no existe, para que la compra completa se revierta.
+    /// </summary>
+    public void AumentarExistencia(SqliteConnection connection, SqliteTransaction transaction, int idProducto, int cantidad)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE Productos SET Existencia = Existencia + $cantidad WHERE IdProducto = $id;";
+        command.Parameters.AddWithValue("$cantidad", cantidad);
+        command.Parameters.AddWithValue("$id", idProducto);
+
+        if (command.ExecuteNonQuery() == 0)
+        {
+            throw new InvalidOperationException($"El producto #{idProducto} ya no existe.");
+        }
+    }
+
+    /// <summary>
+    /// Ajuste manual de existencia (conteo físico). Se ejecuta en una
+    /// transacción y el trigger TR_Productos_ExistenciaNoNegativa_Upd
+    /// impide dejar el stock en negativo.
+    /// </summary>
     public void AjustarExistencia(int idProducto, int nuevaExistencia)
     {
         using var connection = DatabaseConnection.CreateConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "UPDATE Productos SET Existencia = $existencia WHERE IdProducto = $id;";
         command.Parameters.AddWithValue("$existencia", nuevaExistencia);
         command.Parameters.AddWithValue("$id", idProducto);
-        command.ExecuteNonQuery();
+
+        if (command.ExecuteNonQuery() == 0)
+        {
+            throw new InvalidOperationException("El producto no existe.");
+        }
+
+        transaction.Commit();
+    }
+
+    /// <summary>
+    /// Productos activos con existencia crítica (igual o menor al stock
+    /// mínimo), ordenados del más urgente al menos urgente: primero los
+    /// agotados y luego por cuánto les falta para llegar al mínimo.
+    /// El filtro se resuelve en SQL, sin traer todo el catálogo a memoria.
+    /// </summary>
+    public List<Producto> ObtenerBajoStock()
+    {
+        var productos = new List<Producto>();
+
+        using var connection = DatabaseConnection.CreateConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT p.IdProducto, p.Nombre, p.IdCategoria, c.Nombre, p.PrecioCompra,
+                   p.PrecioVenta, p.Existencia, p.StockMinimo, p.Estado
+            FROM Productos p
+            INNER JOIN Categorias c ON c.IdCategoria = p.IdCategoria
+            WHERE p.Estado = 1
+              AND p.Existencia <= p.StockMinimo
+            ORDER BY (p.Existencia > 0), (p.Existencia - p.StockMinimo), p.Nombre;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            productos.Add(Mapear(reader));
+        }
+
+        return productos;
     }
 
     private static void AgregarParametros(SqliteCommand command, Producto producto)

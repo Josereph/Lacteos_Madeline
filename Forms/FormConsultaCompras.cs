@@ -1,6 +1,8 @@
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -15,6 +17,8 @@ public partial class FormConsultaCompras : Form
     public FormConsultaCompras()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormConsultaCompras_Load;
     }
 
@@ -67,7 +71,7 @@ public partial class FormConsultaCompras : Form
             dgvCompras.Columns["IdProveedor"].Visible = false;
             dgvCompras.Columns["NombreProveedor"].HeaderText = "Proveedor";
             dgvCompras.Columns["Total"].HeaderText = "Total";
-            dgvCompras.Columns["Detalles"].Visible = false;
+            if (dgvCompras.Columns["Detalles"] is { } colDetalles) colDetalles.Visible = false;
         }
 
         dgvDetalle.DataSource = null;
@@ -94,6 +98,16 @@ public partial class FormConsultaCompras : Form
             dgvDetalle.Columns["CostoUnitario"].HeaderText = "Costo Unit.";
             dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal";
         }
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        Diseno.Anclar(Diseno.ArribaAncho, dgvCompras, lblTotalCompras);
+        Diseno.Anclar(Diseno.Todo, dgvDetalle);
     }
 }
 

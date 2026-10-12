@@ -1,3 +1,6 @@
+using LacteosMadeline.Forms;
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline;
 
 partial class Form1
@@ -6,149 +9,263 @@ partial class Form1
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing && (components != null)) components.Dispose();
+        if (disposing && (components != null))
+        {
+            components.Dispose();
+        }
         base.Dispose(disposing);
     }
 
     #region Windows Form Designer generated code
 
-    // Fase 1
-    private Label lblTitulo;
-    private Button btnCategorias;
-    private Button btnProductos;
-    private Button btnVentas;
+    // Barra lateral
+    private Panel panelSidebar;
+    private Panel panelMarca;
+    private Label lblMarca;
+    private Label lblNegocio;
+    private Label lblDescripcion;
+    private Panel panelNavegacion;
+    private Label lblSeccionModulos;
+    private BotonNavegacion btnNavVentas;
+    private BotonNavegacion btnNavProductos;
+    private BotonNavegacion btnNavCompras;
+    private BotonNavegacion btnNavCaja;
+    private BotonNavegacion btnNavMermas;
+    private BotonNavegacion btnNavReportes;
+    private BotonNavegacion btnNavProveedores;
+    private Panel panelPieSidebar;
+    private BotonNavegacion btnRespaldo;
+    private BotonNavegacion btnSalir;
 
-    // Fase 2
-    private Button btnProveedores;
-    private Button btnCompras;
-    private Button btnCaja;
-    private Button btnConsultaVentas;
-    private Button btnConsultaCompras;
-    private Button btnReportes;
-    private Button btnBackup;
-    private Button btnSalir;
+    // Barra superior
+    private Panel panelTopbar;
+    private Label lblModulo;
+    private Label lblRuta;
+    private FlowLayoutPanel panelIndicadores;
+    private IndicadorEstado indCaja;
+    private IndicadorEstado indStock;
+    private IndicadorEstado indReloj;
 
-    private Label lblSeparador1;
-    private Label lblSeparador2;
+    // Contenido
+    private PanelSinParpadeo panelContent;
+
+    private System.Windows.Forms.Timer timerReloj;
+    private System.Windows.Forms.Timer timerEstado;
 
     private void InitializeComponent()
     {
         components = new System.ComponentModel.Container();
 
-        lblTitulo         = new Label();
-        lblSeparador1     = new Label();
-        lblSeparador2     = new Label();
-        btnCategorias     = new Button();
-        btnProductos      = new Button();
-        btnVentas         = new Button();
-        btnProveedores    = new Button();
-        btnCompras        = new Button();
-        btnCaja           = new Button();
-        btnConsultaVentas = new Button();
-        btnConsultaCompras = new Button();
-        btnReportes       = new Button();
-        btnBackup         = new Button();
-        btnSalir          = new Button();
+        panelSidebar = new Panel();
+        panelMarca = new Panel();
+        lblMarca = new Label();
+        lblNegocio = new Label();
+        lblDescripcion = new Label();
+        panelNavegacion = new Panel();
+        lblSeccionModulos = new Label();
+        btnNavVentas = new BotonNavegacion();
+        btnNavProductos = new BotonNavegacion();
+        btnNavCompras = new BotonNavegacion();
+        btnNavCaja = new BotonNavegacion();
+        btnNavMermas = new BotonNavegacion();
+        btnNavReportes = new BotonNavegacion();
+        btnNavProveedores = new BotonNavegacion();
+        panelPieSidebar = new Panel();
+        btnRespaldo = new BotonNavegacion();
+        btnSalir = new BotonNavegacion();
+        panelTopbar = new Panel();
+        lblModulo = new Label();
+        lblRuta = new Label();
+        panelIndicadores = new FlowLayoutPanel();
+        indCaja = new IndicadorEstado();
+        indStock = new IndicadorEstado();
+        indReloj = new IndicadorEstado();
+        panelContent = new PanelSinParpadeo();
+        timerReloj = new System.Windows.Forms.Timer(components);
+        timerEstado = new System.Windows.Forms.Timer(components);
 
+        panelSidebar.SuspendLayout();
+        panelNavegacion.SuspendLayout();
+        panelTopbar.SuspendLayout();
         SuspendLayout();
 
-        // ── Título ─────────────────────────────────────────────────────
-        lblTitulo.AutoSize = true;
-        lblTitulo.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
-        lblTitulo.Location = new Point(30, 20);
-        lblTitulo.Text = "Lácteos Madeline";
+        var crema = Tema.Crema;
+        var cremaTenue = ColorTranslator.FromHtml("#A9A29A");
 
-        // ── Separadores de sección ─────────────────────────────────────
-        lblSeparador1.AutoSize = true;
-        lblSeparador1.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
-        lblSeparador1.ForeColor = Color.Gray;
-        lblSeparador1.Location = new Point(30, 73);
-        lblSeparador1.Text = "─── CATÁLOGO Y VENTAS ────────────────";
+        // ── Barra lateral ───────────────────────────────────────────────
+        panelSidebar.Dock = DockStyle.Left;
+        panelSidebar.Width = 240;
+        panelSidebar.BackColor = Tema.Carbon;
 
-        lblSeparador2.AutoSize = true;
-        lblSeparador2.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
-        lblSeparador2.ForeColor = Color.Gray;
-        lblSeparador2.Location = new Point(30, 228);
-        lblSeparador2.Text = "─── ADMINISTRACIÓN ───────────────────";
+        // Encabezado institucional
+        panelMarca.Dock = DockStyle.Top;
+        panelMarca.Height = 118;
+        panelMarca.BackColor = Tema.Carbon;
+        panelMarca.Paint += (_, e) =>
+        {
+            using var linea = new Pen(ColorTranslator.FromHtml("#3A3433"));
+            e.Graphics.DrawLine(linea, 24, panelMarca.Height - 1, panelMarca.Width - 24, panelMarca.Height - 1);
+        };
 
-        // ── Columna izquierda (x=30) ───────────────────────────────────
-        int xl = 30, xr = 165, w = 125, h = 38, gap = 10;
+        lblMarca.AutoSize = false;
+        lblMarca.Location = new Point(24, 24);
+        lblMarca.Size = new Size(200, 18);
+        lblMarca.Font = new Font(Tema.Familia, 9F, FontStyle.Bold);
+        lblMarca.ForeColor = Tema.CafeClaro;
+        lblMarca.Text = "SYSCAT";
 
-        // Fase 1 — fila 1
-        int y1 = 93;
-        ConfigurarBoton(btnCategorias, "Categorías",   xl, y1, w, h);
-        ConfigurarBoton(btnProductos,  "Productos",    xr, y1, w, h);
+        lblNegocio.AutoSize = false;
+        lblNegocio.Location = new Point(22, 44);
+        lblNegocio.Size = new Size(210, 32);
+        lblNegocio.Font = new Font(Tema.Familia, 16F, FontStyle.Bold);
+        lblNegocio.ForeColor = crema;
+        lblNegocio.Text = "Lácteos Madeline";
 
-        // Fase 1 — fila 2
-        int y2 = y1 + h + gap;
-        btnVentas.Location = new Point(xl, y2);
-        btnVentas.Size = new Size(w * 2 + 5, h);
-        btnVentas.Text = "Nueva Venta";
-        btnVentas.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        btnVentas.Click += btnVentas_Click;
+        lblDescripcion.AutoSize = false;
+        lblDescripcion.Location = new Point(24, 78);
+        lblDescripcion.Size = new Size(200, 20);
+        lblDescripcion.Font = new Font(Tema.Familia, 8.75F);
+        lblDescripcion.ForeColor = cremaTenue;
+        lblDescripcion.Text = "Facturación e inventario";
 
-        // ── Fase 2 ────────────────────────────────────────────────────
-        int y3 = 248;
-        ConfigurarBoton(btnProveedores,    "Proveedores",    xl, y3, w, h);
-        ConfigurarBoton(btnCompras,        "Compras",        xr, y3, w, h);
+        panelMarca.Controls.AddRange(new Control[] { lblMarca, lblNegocio, lblDescripcion });
 
-        int y4 = y3 + h + gap;
-        ConfigurarBoton(btnCaja,           "Control de Caja",  xl, y4, w, h);
-        ConfigurarBoton(btnConsultaVentas, "Consulta Ventas",  xr, y4, w, h);
+        // Navegación (los controles con Dock=Top se apilan en orden inverso)
+        panelNavegacion.Dock = DockStyle.Fill;
+        panelNavegacion.BackColor = Tema.Carbon;
+        panelNavegacion.Padding = new Padding(0, 8, 0, 0);
 
-        int y5 = y4 + h + gap;
-        ConfigurarBoton(btnConsultaCompras, "Consulta Compras", xl, y5, w, h);
-        ConfigurarBoton(btnReportes,         "Reportes",         xr, y5, w, h);
+        lblSeccionModulos.Dock = DockStyle.Top;
+        lblSeccionModulos.Height = 36;
+        lblSeccionModulos.Padding = new Padding(24, 12, 0, 0);
+        lblSeccionModulos.Font = new Font(Tema.Familia, 8.25F, FontStyle.Bold);
+        lblSeccionModulos.ForeColor = cremaTenue;
+        lblSeccionModulos.Text = "MÓDULOS";
 
-        int y6 = y5 + h + gap;
-        ConfigurarBoton(btnBackup, "Respaldo",  xl, y6, w, h);
+        ConfigurarNav(btnNavVentas,      "Punto de Venta",          Icono.PuntoDeVenta);
+        ConfigurarNav(btnNavProductos,   "Productos e Inventario",  Icono.Productos);
+        ConfigurarNav(btnNavCompras,     "Registro de Compras",     Icono.Compras);
+        ConfigurarNav(btnNavCaja,        "Control de Caja",         Icono.Caja);
+        ConfigurarNav(btnNavMermas,      "Mermas y Bajas",          Icono.Mermas);
+        ConfigurarNav(btnNavReportes,    "Reportes y Consultas",    Icono.Reportes);
+        ConfigurarNav(btnNavProveedores, "Proveedores",             Icono.Proveedores);
 
-        // ── Salir ──────────────────────────────────────────────────────
-        int y7 = y6 + h + 15;
-        btnSalir.Location = new Point(xl, y7);
-        btnSalir.Size = new Size(w * 2 + 5, 35);
-        btnSalir.Text = "Salir";
+        panelNavegacion.Controls.AddRange(new Control[]
+        {
+            btnNavProveedores, btnNavReportes, btnNavMermas, btnNavCaja,
+            btnNavCompras, btnNavProductos, btnNavVentas, lblSeccionModulos
+        });
+
+        // Pie: acciones de sistema delimitadas
+        panelPieSidebar.Dock = DockStyle.Bottom;
+        panelPieSidebar.Height = 124;
+        panelPieSidebar.BackColor = Tema.Carbon;
+        panelPieSidebar.Padding = new Padding(0, 6, 0, 14);
+        panelPieSidebar.Paint += (_, e) =>
+        {
+            using var linea = new Pen(ColorTranslator.FromHtml("#3A3433"));
+            e.Graphics.DrawLine(linea, 24, 0, panelPieSidebar.Width - 24, 0);
+        };
+
+        ConfigurarNav(btnRespaldo, "Respaldo de datos", Icono.Respaldo);
+        btnRespaldo.EsAccionSistema = true;
+        btnRespaldo.Height = 50;
+        btnRespaldo.Click += btnRespaldo_Click;
+
+        ConfigurarNav(btnSalir, "Salir del sistema", Icono.Salir);
+        btnSalir.EsAccionSistema = true;
+        btnSalir.Height = 50;
         btnSalir.Click += btnSalir_Click;
 
-        // ── Eventos Fase 1 ─────────────────────────────────────────────
-        btnCategorias.Click += btnCategorias_Click;
-        btnProductos.Click  += btnProductos_Click;
-        btnVentas.Click     += btnVentas_Click;
+        panelPieSidebar.Controls.AddRange(new Control[] { btnSalir, btnRespaldo });
 
-        // ── Eventos Fase 2 ─────────────────────────────────────────────
-        btnProveedores.Click    += btnProveedores_Click;
-        btnCompras.Click        += btnCompras_Click;
-        btnCaja.Click           += btnCaja_Click;
-        btnConsultaVentas.Click += btnConsultaVentas_Click;
-        btnConsultaCompras.Click += btnConsultaCompras_Click;
-        btnReportes.Click       += btnReportes_Click;
-        btnBackup.Click         += btnBackup_Click;
+        panelSidebar.Controls.Add(panelNavegacion);
+        panelSidebar.Controls.Add(panelPieSidebar);
+        panelSidebar.Controls.Add(panelMarca);
 
-        // ── Form ───────────────────────────────────────────────────────
-        AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(310, y7 + 60);
-        Controls.AddRange(new Control[]
+        // ── Barra superior ──────────────────────────────────────────────
+        panelTopbar.Dock = DockStyle.Top;
+        panelTopbar.Height = 72;
+        panelTopbar.BackColor = Color.White;
+        panelTopbar.Paint += (_, e) =>
         {
-            lblTitulo, lblSeparador1, lblSeparador2,
-            btnCategorias, btnProductos, btnVentas,
-            btnProveedores, btnCompras, btnCaja,
-            btnConsultaVentas, btnConsultaCompras, btnReportes,
-            btnBackup, btnSalir
-        });
-        Text = "Lácteos Madeline – Menú Principal";
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
+            using var linea = new Pen(Tema.BordeSuave);
+            e.Graphics.DrawLine(linea, 0, panelTopbar.Height - 1, panelTopbar.Width, panelTopbar.Height - 1);
+        };
 
+        lblRuta.AutoSize = true;
+        lblRuta.Location = new Point(28, 12);
+        lblRuta.Font = new Font(Tema.Familia, 8.75F);
+        lblRuta.ForeColor = Tema.GrisCalido;
+        lblRuta.Text = "Lácteos Madeline";
+
+        lblModulo.AutoSize = true;
+        lblModulo.Location = new Point(26, 30);
+        lblModulo.Font = new Font(Tema.Familia, 16F, FontStyle.Bold);
+        lblModulo.ForeColor = Tema.Carbon;
+        lblModulo.Text = "Punto de Venta";
+
+        panelIndicadores.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        panelIndicadores.FlowDirection = FlowDirection.LeftToRight;
+        panelIndicadores.WrapContents = false;
+        panelIndicadores.AutoSize = true;
+        panelIndicadores.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        panelIndicadores.BackColor = Color.White;
+        panelIndicadores.Location = new Point(600, 18);
+
+        indCaja.MostrarPunto = true;
+        indCaja.Clicable = true;
+        indCaja.Margin = new Padding(0, 0, 10, 0);
+        indCaja.Click += (_, _) => Navegar(Modulo.Caja);
+
+        indStock.Icono = Icono.Alerta;
+        indStock.Clicable = true;
+        indStock.Margin = new Padding(0, 0, 10, 0);
+        indStock.Click += (_, _) => MostrarStockCritico();
+
+        indReloj.Icono = Icono.Reloj;
+        indReloj.Margin = new Padding(0);
+        indReloj.Font = new Font(Tema.Familia, 9.75F);
+
+        panelIndicadores.Controls.AddRange(new Control[] { indCaja, indStock, indReloj });
+        panelTopbar.Controls.AddRange(new Control[] { lblRuta, lblModulo, panelIndicadores });
+        panelTopbar.Resize += (_, _) => UbicarIndicadores();
+        panelIndicadores.SizeChanged += (_, _) => UbicarIndicadores();
+
+        // ── Contenido ───────────────────────────────────────────────────
+        panelContent.Dock = DockStyle.Fill;
+        panelContent.BackColor = Tema.BlancoLacteo;
+
+        // ── Temporizadores ──────────────────────────────────────────────
+        timerReloj.Interval = 1000;
+        timerReloj.Tick += (_, _) => ActualizarReloj();
+        timerEstado.Interval = 5000;
+        timerEstado.Tick += (_, _) => ActualizarEstado();
+
+        // ── Form ────────────────────────────────────────────────────────
+        AutoScaleMode = AutoScaleMode.Font;
+        ClientSize = new Size(1366, 768);
+        MinimumSize = new Size(1280, 720);
+        Controls.Add(panelContent);
+        Controls.Add(panelTopbar);
+        Controls.Add(panelSidebar);
+        Text = "SYSCAT – Lácteos Madeline";
+        StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
+
+        panelSidebar.ResumeLayout(false);
+        panelNavegacion.ResumeLayout(false);
+        panelTopbar.ResumeLayout(false);
+        panelTopbar.PerformLayout();
         ResumeLayout(false);
-        PerformLayout();
     }
 
-    private static void ConfigurarBoton(Button btn, string texto, int x, int y, int w, int h)
+    private static void ConfigurarNav(BotonNavegacion boton, string texto, Icono icono)
     {
-        btn.Location = new Point(x, y);
-        btn.Size = new Size(w, h);
-        btn.Text = texto;
+        boton.Text = texto;
+        boton.Icono = icono;
+        boton.Dock = DockStyle.Top;
+        boton.Height = 52;
     }
 
     #endregion

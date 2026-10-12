@@ -2,6 +2,8 @@ using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 using LacteosMadeline.Services;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -19,6 +21,8 @@ public partial class FormProductos : Form
     public FormProductos()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormProductos_Load;
     }
 
@@ -46,6 +50,7 @@ public partial class FormProductos : Form
         if (dgvProductos.Columns["IdCategoria"] != null)
         {
             dgvProductos.Columns["IdCategoria"].Visible = false;
+            dgvProductos.Columns["IdProducto"].HeaderText = "#";
             dgvProductos.Columns["NombreCategoria"].HeaderText = "Categoría";
             dgvProductos.Columns["PrecioCompra"].HeaderText = "P. Compra";
             dgvProductos.Columns["PrecioVenta"].HeaderText = "P. Venta";
@@ -177,7 +182,22 @@ public partial class FormProductos : Form
 
     private void MostrarMensaje(string mensaje, bool esError = true)
     {
-        lblMensaje.ForeColor = esError ? Color.DarkRed : Color.DarkGreen;
+        lblMensaje.ForeColor = esError ? Tema.Alerta : Tema.Exito;
         lblMensaje.Text = mensaje;
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        Diseno.Anclar(Diseno.Todo, dgvProductos);
+        Diseno.Anclar(Diseno.AbajoIzquierda,
+            lblNombre, txtNombre, lblCategoria, cboCategoria,
+            lblPrecioCompra, txtPrecioCompra, lblPrecioVenta, txtPrecioVenta,
+            lblExistencia, txtExistencia, lblStockMinimo, txtStockMinimo,
+            btnNuevo, btnGuardar, btnActivarDesactivar);
+        Diseno.Anclar(Diseno.AbajoAncho, lblMensaje);
     }
 }

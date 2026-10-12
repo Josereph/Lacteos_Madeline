@@ -13,9 +13,134 @@ public static class DatabaseInitializer
     {
         using var connection = DatabaseConnection.CreateConnection();
 
+        ActivarWal(connection);
         CrearTablas(connection);
         MigrarVentasMetodoPago(connection);
+        MigrarCajasCierre(connection);
+        CrearIndices(connection);
+        CrearReglasIntegridad(connection);
         SembrarDatosIniciales(connection);
+    }
+
+    /// <summary>
+    /// WAL (Write-Ahead Logging): las escrituras se agregan a un archivo
+    /// aparte y se integran después. Un cierre abrupto nunca deja la base
+    /// a medias, las lecturas no bloquean las escrituras y cada venta se
+    /// confirma más rápido. Es persistente: basta fijarlo una vez.
+    /// </summary>
+    private static void ActivarWal(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Agrega a Cajas el saldo esperado y la diferencia calculados al
+    /// momento del cierre, para que el arqueo quede registrado y no dependa
+    /// de recalcularlo después.
+    /// </summary>
+    private static void MigrarCajasCierre(SqliteConnection connection)
+    {
+        if (ExisteColumna(connection, "Cajas", "MontoEsperado"))
+        {
+            return;
+        }
+
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            ALTER TABLE Cajas ADD COLUMN MontoEsperado REAL NULL;
+            ALTER TABLE Cajas ADD COLUMN Diferencia REAL NULL;
+            """;
+        command.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    /// <summary>
+    /// Índices para las consultas frecuentes: búsquedas de productos,
+    /// rangos de fechas en ventas/compras/mermas, totales por caja y
+    /// detalle por venta/producto (reporte de más vendidos).
+    /// </summary>
+    private static void CrearIndices(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE INDEX IF NOT EXISTS IX_Productos_Estado_Nombre ON Productos (Estado, Nombre);
+            CREATE INDEX IF NOT EXISTS IX_Productos_Categoria     ON Productos (IdCategoria);
+            CREATE INDEX IF NOT EXISTS IX_Ventas_FechaHora        ON Ventas (FechaHora);
+            CREATE INDEX IF NOT EXISTS IX_Ventas_Caja_Metodo      ON Ventas (IdCaja, MetodoPago, Total);
+            CREATE INDEX IF NOT EXISTS IX_DetalleVentas_Venta     ON DetalleVentas (IdVenta);
+            CREATE INDEX IF NOT EXISTS IX_DetalleVentas_Producto  ON DetalleVentas (IdProducto);
+            CREATE INDEX IF NOT EXISTS IX_Compras_FechaHora       ON Compras (FechaHora);
+            CREATE INDEX IF NOT EXISTS IX_Compras_Proveedor       ON Compras (IdProveedor);
+            CREATE INDEX IF NOT EXISTS IX_DetalleCompras_Compra   ON DetalleCompras (IdCompra);
+            CREATE INDEX IF NOT EXISTS IX_MovimientosCaja_Caja    ON MovimientosCaja (IdCaja, Tipo, Monto);
+            CREATE INDEX IF NOT EXISTS IX_Mermas_FechaHora        ON Mermas (FechaHora);
+            CREATE INDEX IF NOT EXISTS IX_Mermas_Producto         ON Mermas (IdProducto);
+
+            -- Solo puede existir UNA caja abierta: lo garantiza la propia base.
+            CREATE UNIQUE INDEX IF NOT EXISTS UX_Cajas_UnaAbierta ON Cajas (Estado) WHERE Estado = 'Abierta';
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Reglas de integridad aplicadas por la propia base de datos, como
+    /// última línea de defensa aunque un error de programación saltara las
+    /// validaciones de los servicios. Si se violan, la operación completa
+    /// se revierte (RAISE ABORT dentro de la transacción).
+    /// </summary>
+    private static void CrearReglasIntegridad(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TRIGGER IF NOT EXISTS TR_Productos_ExistenciaNoNegativa_Upd
+            BEFORE UPDATE OF Existencia ON Productos
+            WHEN NEW.Existencia < 0
+            BEGIN SELECT RAISE(ABORT, 'La existencia del producto no puede quedar negativa.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_Productos_ExistenciaNoNegativa_Ins
+            BEFORE INSERT ON Productos
+            WHEN NEW.Existencia < 0 OR NEW.StockMinimo < 0 OR NEW.PrecioVenta < 0
+            BEGIN SELECT RAISE(ABORT, 'Existencia, stock mínimo y precio no pueden ser negativos.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_DetalleVentas_Valido
+            BEFORE INSERT ON DetalleVentas
+            WHEN NEW.Cantidad <= 0 OR NEW.PrecioUnitario < 0
+            BEGIN SELECT RAISE(ABORT, 'Línea de venta inválida: cantidad o precio fuera de rango.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_DetalleCompras_Valido
+            BEFORE INSERT ON DetalleCompras
+            WHEN NEW.Cantidad <= 0 OR NEW.CostoUnitario < 0
+            BEGIN SELECT RAISE(ABORT, 'Línea de compra inválida: cantidad o costo fuera de rango.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_Mermas_Valida
+            BEFORE INSERT ON Mermas
+            WHEN NEW.Cantidad <= 0
+            BEGIN SELECT RAISE(ABORT, 'La cantidad de la merma debe ser mayor que cero.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_Ventas_CajaAbierta
+            BEFORE INSERT ON Ventas
+            WHEN NEW.IdCaja IS NULL
+              OR COALESCE((SELECT Estado FROM Cajas WHERE IdCaja = NEW.IdCaja), '') <> 'Abierta'
+            BEGIN SELECT RAISE(ABORT, 'No hay una caja abierta para registrar la venta.'); END;
+
+            CREATE TRIGGER IF NOT EXISTS TR_MovimientosCaja_Valido
+            BEFORE INSERT ON MovimientosCaja
+            WHEN NEW.Monto <= 0
+              OR NEW.Tipo NOT IN ('Entrada', 'Salida')
+              OR COALESCE((SELECT Estado FROM Cajas WHERE IdCaja = NEW.IdCaja), '') <> 'Abierta'
+            BEGIN SELECT RAISE(ABORT, 'Movimiento de caja inválido o caja cerrada.'); END;
+
+            -- Una caja cerrada es un registro contable: no se modifica.
+            CREATE TRIGGER IF NOT EXISTS TR_Cajas_CerradaInmutable
+            BEFORE UPDATE ON Cajas
+            WHEN OLD.Estado = 'Cerrada'
+            BEGIN SELECT RAISE(ABORT, 'La caja ya está cerrada y no puede modificarse.'); END;
+            """;
+        command.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -146,6 +271,20 @@ public static class DatabaseInitializer
                 Monto        REAL NOT NULL,
                 Descripcion  TEXT NULL,
                 FOREIGN KEY (IdCaja) REFERENCES Cajas (IdCaja)
+            );
+
+            -- Bajas de inventario por caducidad, daño u otro motivo.
+            -- No afectan ventas ni caja; conservan nombre y costo históricos.
+            CREATE TABLE IF NOT EXISTS Mermas (
+                IdMerma        INTEGER PRIMARY KEY AUTOINCREMENT,
+                FechaHora      TEXT NOT NULL,
+                IdProducto     INTEGER NOT NULL,
+                NombreProducto TEXT NOT NULL,
+                Cantidad       INTEGER NOT NULL,
+                Motivo         TEXT NOT NULL,
+                CostoUnitario  REAL NULL,
+                Observacion    TEXT NULL,
+                FOREIGN KEY (IdProducto) REFERENCES Productos (IdProducto)
             );
             """;
 

@@ -2,6 +2,8 @@ using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -15,6 +17,8 @@ public partial class FormConsultaVentas : Form
     public FormConsultaVentas()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormConsultaVentas_Load;
     }
 
@@ -46,7 +50,7 @@ public partial class FormConsultaVentas : Form
             dgvVentas.Columns["MontoRecibido"].HeaderText = "Recibido";
             dgvVentas.Columns["Cambio"].HeaderText = "Cambio";
             dgvVentas.Columns["IdCaja"].HeaderText = "# Caja";
-            dgvVentas.Columns["Detalles"].Visible = false;
+            if (dgvVentas.Columns["Detalles"] is { } colDetalles) colDetalles.Visible = false;
         }
 
         dgvDetalle.DataSource = null;
@@ -55,23 +59,15 @@ public partial class FormConsultaVentas : Form
 
     private List<Venta> ObtenerVentasFiltradas()
     {
-        var todas = _ventaRepository.ObtenerHistorial();
-
-        // Filtro por número
+        // El filtro se resuelve en SQL (por clave o por índice de fecha) en
+        // lugar de cargar todo el historial en memoria y filtrar aquí.
         if (nudIdVenta.Value > 0)
         {
-            var idBuscado = (int)nudIdVenta.Value;
-            todas = todas.Where(v => v.IdVenta == idBuscado).ToList();
-        }
-        else
-        {
-            // Filtro por rango de fechas
-            var desde = dtpDesde.Value.Date;
-            var hasta = dtpHasta.Value.Date.AddDays(1).AddSeconds(-1);
-            todas = todas.Where(v => v.FechaHora >= desde && v.FechaHora <= hasta).ToList();
+            var venta = _ventaRepository.ObtenerPorId((int)nudIdVenta.Value);
+            return venta is null ? new List<Venta>() : new List<Venta> { venta };
         }
 
-        return todas;
+        return _ventaRepository.ObtenerPorRango(dtpDesde.Value.Date, dtpHasta.Value.Date);
     }
 
     private void dgvVentas_SelectionChanged(object? sender, EventArgs e)
@@ -124,5 +120,16 @@ public partial class FormConsultaVentas : Form
                     "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        Diseno.Anclar(Diseno.ArribaAncho, dgvVentas);
+        Diseno.Anclar(Diseno.ArribaDerecha, btnReimprimir);
+        Diseno.Anclar(Diseno.Todo, dgvDetalle);
     }
 }

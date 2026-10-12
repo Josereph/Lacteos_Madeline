@@ -1,5 +1,7 @@
 using LacteosMadeline.Services;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -14,6 +16,8 @@ public partial class FormReportes : Form
     public FormReportes()
     {
         InitializeComponent();
+        Tema.Aplicar(this);
+        ConfigurarDisenoAdaptable();
         Load += FormReportes_Load;
     }
 
@@ -22,6 +26,26 @@ public partial class FormReportes : Form
         dtpDesde.Value = DateTime.Today.AddDays(-30);
         dtpHasta.Value = DateTime.Today;
         GenerarReporteActivo();
+    }
+
+    public const int PestanaBajoStock = 3;
+
+    /// <summary>
+    /// Abre directamente una pestaña de reporte (lo usa la alerta de
+    /// stock crítico de la barra superior).
+    /// </summary>
+    public void MostrarPestana(int indice)
+    {
+        if (indice < 0 || indice >= tabReportes.TabCount) return;
+
+        if (tabReportes.SelectedIndex == indice)
+        {
+            GenerarReporteActivo();
+        }
+        else
+        {
+            tabReportes.SelectedIndex = indice; // genera el reporte vía SelectedIndexChanged
+        }
     }
 
     private void btnGenerar_Click(object? sender, EventArgs e)
@@ -53,6 +77,7 @@ public partial class FormReportes : Form
         }
         catch (Exception ex)
         {
+            Helpers.LogHelper.Error($"Generar reporte '{tabReportes.SelectedTab?.Text}'", ex);
             dgvReporte.DataSource = null;
             MostrarMensaje($"No se pudo generar el reporte: {ex.Message}");
         }
@@ -161,7 +186,9 @@ public partial class FormReportes : Form
             dgvReporte.Columns["FechaApertura"].HeaderText = "Apertura";
             dgvReporte.Columns["MontoInicial"].HeaderText = "Monto Inicial";
             dgvReporte.Columns["FechaCierre"].HeaderText = "Cierre";
-            dgvReporte.Columns["MontoFinal"].HeaderText = "Monto Final";
+            dgvReporte.Columns["MontoFinal"].HeaderText = "Monto Contado";
+            dgvReporte.Columns["MontoEsperado"].HeaderText = "Monto Esperado";
+            dgvReporte.Columns["Diferencia"].HeaderText = "Diferencia";
             dgvReporte.Columns["Estado"].HeaderText = "Estado";
         }
 
@@ -250,7 +277,18 @@ public partial class FormReportes : Form
 
     private void MostrarMensaje(string mensaje, bool esError = true)
     {
-        lblMensaje.ForeColor = esError ? Color.DarkRed : Color.DarkGreen;
+        lblMensaje.ForeColor = esError ? Tema.Alerta : Tema.Exito;
         lblMensaje.Text = mensaje;
+    }
+
+    /// <summary>
+    /// Anclajes para que la pantalla se expanda dentro de la ventana
+    /// maximizada: las tablas crecen y los botones se mantienen en su borde.
+    /// </summary>
+    private void ConfigurarDisenoAdaptable()
+    {
+        Diseno.Anclar(Diseno.ArribaAncho, tabReportes);
+        Diseno.Anclar(Diseno.Todo, dgvReporte);
+        Diseno.Anclar(Diseno.AbajoAncho, lblMensaje);
     }
 }

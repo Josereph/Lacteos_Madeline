@@ -84,6 +84,14 @@ public class CompraService
             return (false, "El proveedor seleccionado no es válido o está inactivo.", null);
         }
 
+        foreach (var linea in _detalle)
+        {
+            if (linea.Cantidad <= 0 || linea.CostoUnitario < 0)
+            {
+                return (false, $"La línea \"{linea.NombreProducto}\" tiene cantidad o costo inválido.", null);
+            }
+        }
+
         var compra = new Compra
         {
             FechaHora       = DateTime.Now,
@@ -102,7 +110,12 @@ public class CompraService
         }
         catch (Exception ex)
         {
-            return (false, $"Error al registrar la compra: {ex.Message}", null);
+            if (!ErroresBaseDatos.EsReglaDeIntegridad(ex) && ex is not InvalidOperationException)
+            {
+                LogHelper.Error($"Confirmar compra (proveedor #{idProveedor}, total {compra.Total:F2})", ex);
+            }
+
+            return (false, $"No se pudo registrar la compra. No se guardó ningún cambio.\nDetalle: {ErroresBaseDatos.MensajeAmigable(ex)}", null);
         }
     }
 }

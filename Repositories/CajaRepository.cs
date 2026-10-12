@@ -7,14 +7,24 @@ namespace LacteosMadeline.Repositories;
 /// <summary>
 /// Acceso a datos para Cajas y MovimientosCaja.
 /// Garantiza que solo exista una caja con Estado 'Abierta' al mismo tiempo
-/// (validación de sección 23 de los lineamientos).
+/// (validación de sección 23 de los lineamientos; reforzado por el índice
+/// único UX_Cajas_UnaAbierta).
+/// Las escrituras que dependen de un cálculo (salidas y cierre) leen y
+/// escriben dentro de la misma transacción: BeginTransaction() en
+/// Microsoft.Data.Sqlite usa BEGIN IMMEDIATE (aislamiento Serializable),
+/// por lo que nadie más puede escribir entre el cálculo y el guardado.
 /// </summary>
 public class CajaRepository
 {
+    private const string ColumnasCaja =
+        "IdCaja, FechaApertura, MontoInicial, FechaCierre, MontoFinal, Estado, MontoEsperado, Diferencia";
+
     public int AbrirCaja(decimal montoInicial)
     {
         using var connection = DatabaseConnection.CreateConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO Cajas (FechaApertura, MontoInicial, Estado)
             VALUES ($fechaApertura, $montoInicial, 'Abierta');
@@ -23,24 +33,55 @@ public class CajaRepository
         command.Parameters.AddWithValue("$fechaApertura", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         command.Parameters.AddWithValue("$montoInicial", montoInicial);
 
-        return Convert.ToInt32(command.ExecuteScalar());
+        var id = Convert.ToInt32(command.ExecuteScalar());
+        transaction.Commit();
+        return id;
     }
 
-    public void CerrarCaja(int idCaja, decimal montoFinal)
+    /// <summary>
+    /// Cierra la caja de forma atómica: recalcula los totales, guarda el
+    /// monto contado, el saldo esperado y la diferencia, todo en una sola
+    /// transacción. Devuelve los totales usados para el arqueo.
+    /// </summary>
+    public TotalesCaja CerrarCaja(int idCaja, decimal montoFinal)
     {
         using var connection = DatabaseConnection.CreateConnection();
+        using var transaction = connection.BeginTransaction();
+
+        var totales = ObtenerTotales(connection, transaction, idCaja)
+            ?? throw new InvalidOperationException("No se encontró la caja indicada.");
+
+        if (totales.Estado != "Abierta")
+        {
+            throw new InvalidOperationException("La caja ya se encuentra cerrada.");
+        }
+
+        var esperado = totales.SaldoEsperado;
+
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             UPDATE Cajas
-            SET FechaCierre = $fechaCierre,
-                MontoFinal  = $montoFinal,
-                Estado      = 'Cerrada'
-            WHERE IdCaja = $id;
+            SET FechaCierre   = $fechaCierre,
+                MontoFinal    = $montoFinal,
+                MontoEsperado = $montoEsperado,
+                Diferencia    = $diferencia,
+                Estado        = 'Cerrada'
+            WHERE IdCaja = $id AND Estado = 'Abierta';
             """;
         command.Parameters.AddWithValue("$fechaCierre", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
         command.Parameters.AddWithValue("$montoFinal", montoFinal);
+        command.Parameters.AddWithValue("$montoEsperado", esperado);
+        command.Parameters.AddWithValue("$diferencia", montoFinal - esperado);
         command.Parameters.AddWithValue("$id", idCaja);
-        command.ExecuteNonQuery();
+
+        if (command.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException("No se pudo cerrar la caja: su estado cambió.");
+        }
+
+        transaction.Commit();
+        return totales;
     }
 
     /// <summary>
@@ -50,12 +91,7 @@ public class CajaRepository
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT IdCaja, FechaApertura, MontoInicial, FechaCierre, MontoFinal, Estado
-            FROM Cajas
-            WHERE Estado = 'Abierta'
-            LIMIT 1;
-            """;
+        command.CommandText = $"SELECT {ColumnasCaja} FROM Cajas WHERE Estado = 'Abierta' LIMIT 1;";
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? Mapear(reader) : null;
@@ -65,21 +101,38 @@ public class CajaRepository
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT IdCaja, FechaApertura, MontoInicial, FechaCierre, MontoFinal, Estado
-            FROM Cajas
-            WHERE IdCaja = $id;
-            """;
+        command.CommandText = $"SELECT {ColumnasCaja} FROM Cajas WHERE IdCaja = $id;";
         command.Parameters.AddWithValue("$id", idCaja);
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? Mapear(reader) : null;
     }
 
+    /// <summary>
+    /// Registra un movimiento manual. Para salidas verifica, dentro de la
+    /// misma transacción, que no se retire más efectivo del que hay en caja.
+    /// </summary>
     public int RegistrarMovimiento(MovimientoCaja movimiento)
     {
         using var connection = DatabaseConnection.CreateConnection();
+        using var transaction = connection.BeginTransaction();
+
+        var totales = ObtenerTotales(connection, transaction, movimiento.IdCaja)
+            ?? throw new InvalidOperationException("No se encontró la caja indicada.");
+
+        if (totales.Estado != "Abierta")
+        {
+            throw new InvalidOperationException("La caja está cerrada; no admite movimientos.");
+        }
+
+        if (movimiento.Tipo == "Salida" && movimiento.Monto > totales.SaldoEsperado)
+        {
+            throw new InvalidOperationException(
+                $"La salida ({movimiento.Monto:C2}) supera el efectivo disponible en caja ({totales.SaldoEsperado:C2}).");
+        }
+
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO MovimientosCaja (IdCaja, FechaHora, Tipo, Monto, Descripcion)
             VALUES ($idCaja, $fechaHora, $tipo, $monto, $descripcion);
@@ -91,7 +144,9 @@ public class CajaRepository
         command.Parameters.AddWithValue("$monto", movimiento.Monto);
         command.Parameters.AddWithValue("$descripcion", (object?)movimiento.Descripcion ?? DBNull.Value);
 
-        return Convert.ToInt32(command.ExecuteScalar());
+        var id = Convert.ToInt32(command.ExecuteScalar());
+        transaction.Commit();
+        return id;
     }
 
     public List<MovimientoCaja> ObtenerMovimientos(int idCaja)
@@ -126,26 +181,54 @@ public class CajaRepository
     }
 
     /// <summary>
-    /// Totales de las ventas registradas en la caja indicada, separando
-    /// el efectivo (que sí entra físicamente a la gaveta) de los pagos con
-    /// tarjeta o transferencia (sección 13 lineamientos).
+    /// Totales de la caja en una sola consulta: fondo inicial, ventas en
+    /// efectivo (lo único que entra físicamente a la gaveta), ventas con
+    /// otros métodos, entradas y salidas. Usa los índices
+    /// IX_Ventas_Caja_Metodo e IX_MovimientosCaja_Caja (sección 13 lineamientos).
     /// </summary>
-    public (decimal Efectivo, decimal OtrosMetodos) ObtenerTotalesVentas(int idCaja)
+    public TotalesCaja? ObtenerTotales(int idCaja)
     {
         using var connection = DatabaseConnection.CreateConnection();
+        return ObtenerTotales(connection, null, idCaja);
+    }
+
+    private static TotalesCaja? ObtenerTotales(SqliteConnection connection, SqliteTransaction? transaction, int idCaja)
+    {
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
-            SELECT COALESCE(SUM(CASE WHEN MetodoPago = 'Efectivo' THEN Total END), 0),
-                   COALESCE(SUM(CASE WHEN MetodoPago <> 'Efectivo' THEN Total END), 0)
-            FROM Ventas
-            WHERE IdCaja = $idCaja;
+            SELECT c.MontoInicial,
+                   c.Estado,
+                   (SELECT COALESCE(SUM(v.Total), 0) FROM Ventas v
+                     WHERE v.IdCaja = c.IdCaja AND v.MetodoPago = 'Efectivo'),
+                   (SELECT COALESCE(SUM(v.Total), 0) FROM Ventas v
+                     WHERE v.IdCaja = c.IdCaja AND v.MetodoPago <> 'Efectivo'),
+                   (SELECT COALESCE(SUM(m.Monto), 0) FROM MovimientosCaja m
+                     WHERE m.IdCaja = c.IdCaja AND m.Tipo = 'Entrada'),
+                   (SELECT COALESCE(SUM(m.Monto), 0) FROM MovimientosCaja m
+                     WHERE m.IdCaja = c.IdCaja AND m.Tipo = 'Salida')
+            FROM Cajas c
+            WHERE c.IdCaja = $idCaja;
             """;
         command.Parameters.AddWithValue("$idCaja", idCaja);
 
         using var reader = command.ExecuteReader();
-        reader.Read();
-        return (reader.GetDecimal(0), reader.GetDecimal(1));
+        if (!reader.Read())
+        {
+            return null;
+        }
+
+        return new TotalesCaja(
+            MontoInicial:       reader.GetDecimal(0),
+            Estado:             reader.GetString(1),
+            VentasEfectivo:     Redondear(reader.GetDecimal(2)),
+            VentasOtrosMetodos: Redondear(reader.GetDecimal(3)),
+            Entradas:           Redondear(reader.GetDecimal(4)),
+            Salidas:            Redondear(reader.GetDecimal(5)));
     }
+
+    // Las sumas de columnas REAL pueden traer residuos (p. ej. 15.150000000000002).
+    private static decimal Redondear(decimal valor) => Math.Round(valor, 2, MidpointRounding.AwayFromZero);
 
     private static Caja Mapear(SqliteDataReader reader)
     {
@@ -156,7 +239,9 @@ public class CajaRepository
             MontoInicial  = reader.GetDecimal(2),
             FechaCierre   = reader.IsDBNull(3) ? null : DateTime.Parse(reader.GetString(3)),
             MontoFinal    = reader.IsDBNull(4) ? null : reader.GetDecimal(4),
-            Estado        = reader.GetString(5)
+            Estado        = reader.GetString(5),
+            MontoEsperado = reader.IsDBNull(6) ? null : reader.GetDecimal(6),
+            Diferencia    = reader.IsDBNull(7) ? null : reader.GetDecimal(7)
         };
     }
 
@@ -170,11 +255,7 @@ public class CajaRepository
 
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT IdCaja, FechaApertura, MontoInicial, FechaCierre, MontoFinal, Estado
-            FROM Cajas
-            ORDER BY IdCaja DESC;
-            """;
+        command.CommandText = $"SELECT {ColumnasCaja} FROM Cajas ORDER BY IdCaja DESC;";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -185,4 +266,3 @@ public class CajaRepository
         return cajas;
     }
 }
-

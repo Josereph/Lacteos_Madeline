@@ -44,6 +44,12 @@ partial class FormCaja
     private Label lblEntradas;
     private Label lblSalidas;
     private Label lblSaldoEsperado;
+    private Label lblCapInicial;
+    private Label lblCapVentas;
+    private Label lblCapEntradas;
+    private Label lblCapSalidas;
+    private Label lblCapSaldo;
+    private Label lblLineaSaldo;
     private Button btnCerrarCaja;
 
     // Tab Historial
@@ -84,6 +90,12 @@ partial class FormCaja
         lblEntradas            = new Label();
         lblSalidas             = new Label();
         lblSaldoEsperado       = new Label();
+        lblCapInicial          = new Label();
+        lblCapVentas           = new Label();
+        lblCapEntradas         = new Label();
+        lblCapSalidas          = new Label();
+        lblCapSaldo            = new Label();
+        lblLineaSaldo          = new Label();
         btnCerrarCaja          = new Button();
 
         SuspendLayout();
@@ -125,12 +137,12 @@ partial class FormCaja
 
         // ─── Panel Operaciones ─────────────────────────────────────────────
         panelOperaciones.Location = new Point(12, 75);
-        panelOperaciones.Size = new Size(780, 440);
+        panelOperaciones.Size = new Size(780, 495);
         panelOperaciones.Visible = false;
 
         // TabControl dentro del panel operaciones
         tabCaja.Location = new Point(0, 0);
-        tabCaja.Size = new Size(780, 435);
+        tabCaja.Size = new Size(780, 490);
         tabCaja.Parent = panelOperaciones;
 
         tabJornada.Text = "Jornada actual";
@@ -200,22 +212,50 @@ partial class FormCaja
         // GroupBox resumen
         grpResumen.Text = "Resumen de la jornada";
         grpResumen.Location = new Point(5, 290);
-        grpResumen.Size = new Size(760, 115);
+        grpResumen.Size = new Size(760, 160);
         grpResumen.Parent = tabJornada;
 
-        Font fResumen = new Font("Courier New", 9F);
-        Font fResumenBold = new Font("Courier New", 9F, FontStyle.Bold);
-        int rx = 10, ry = 20;
+        // Columna de conceptos (izquierda) y columna de montos alineados a la
+        // derecha: legible de un vistazo sin depender de una fuente monoespaciada.
+        Font fConcepto = new Font("Segoe UI", 9.75F);
+        Font fMonto = new Font("Segoe UI", 9.75F, FontStyle.Bold);
+        int cx = 14, vx = 190, ry = 26, fila = 22;
 
-        lblMontoInicial.Location  = new Point(rx, ry);       lblMontoInicial.Size  = new Size(340, 18); lblMontoInicial.Font  = fResumen; lblMontoInicial.Parent  = grpResumen;
-        lblVentas.Location        = new Point(rx, ry + 18);  lblVentas.Size        = new Size(340, 18); lblVentas.Font        = fResumen; lblVentas.Parent        = grpResumen;
-        lblEntradas.Location      = new Point(rx, ry + 36);  lblEntradas.Size      = new Size(340, 18); lblEntradas.Font      = fResumen; lblEntradas.Parent      = grpResumen;
-        lblSalidas.Location       = new Point(rx, ry + 54);  lblSalidas.Size       = new Size(340, 18); lblSalidas.Font       = fResumen; lblSalidas.Parent       = grpResumen;
-        lblSaldoEsperado.Location = new Point(rx, ry + 72);  lblSaldoEsperado.Size = new Size(340, 18); lblSaldoEsperado.Font = fResumenBold; lblSaldoEsperado.Parent = grpResumen;
-        lblVentasOtros.Location   = new Point(rx + 350, ry + 18); lblVentasOtros.Size = new Size(245, 54); lblVentasOtros.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic); lblVentasOtros.ForeColor = Color.DimGray; lblVentasOtros.Parent = grpResumen;
+        Label Concepto(Label l, string texto, int y)
+        {
+            l.Text = texto; l.Location = new Point(cx, y); l.Size = new Size(170, 20);
+            l.Font = fConcepto; l.Parent = grpResumen;
+            return l;
+        }
 
-        btnCerrarCaja.Location = new Point(610, 35);
-        btnCerrarCaja.Size = new Size(130, 45);
+        void Monto(Label l, int y)
+        {
+            l.Location = new Point(vx, y); l.Size = new Size(130, 20);
+            l.Font = fMonto; l.TextAlign = ContentAlignment.MiddleRight; l.Parent = grpResumen;
+        }
+
+        Concepto(lblCapInicial,  "Fondo inicial",        ry);            Monto(lblMontoInicial, ry);
+        Concepto(lblCapVentas,   "+ Ventas en efectivo",  ry + fila);     Monto(lblVentas,       ry + fila);
+        Concepto(lblCapEntradas, "+ Entradas manuales",  ry + fila * 2); Monto(lblEntradas,     ry + fila * 2);
+        Concepto(lblCapSalidas,  "− Salidas manuales",   ry + fila * 3); Monto(lblSalidas,      ry + fila * 3);
+
+        lblLineaSaldo.Location = new Point(cx, ry + fila * 4 + 2);
+        lblLineaSaldo.Size = new Size(vx + 130 - cx, 1);
+        lblLineaSaldo.BorderStyle = BorderStyle.FixedSingle;
+        lblLineaSaldo.Parent = grpResumen;
+
+        Concepto(lblCapSaldo, "Efectivo esperado", ry + fila * 4 + 8).Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        lblCapSaldo.Size = new Size(170, 24);
+        Monto(lblSaldoEsperado, ry + fila * 4 + 8);
+        lblSaldoEsperado.Size = new Size(130, 24);
+        lblSaldoEsperado.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+
+        lblVentasOtros.Location = new Point(350, ry); lblVentasOtros.Size = new Size(230, 72);
+        lblVentasOtros.Font = new Font("Segoe UI", 9F, FontStyle.Italic); lblVentasOtros.ForeColor = Color.DimGray;
+        lblVentasOtros.Parent = grpResumen;
+
+        btnCerrarCaja.Location = new Point(600, 44);
+        btnCerrarCaja.Size = new Size(146, 56);
         btnCerrarCaja.Text = "Cerrar Caja";
         btnCerrarCaja.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         btnCerrarCaja.BackColor = Color.Firebrick;
@@ -225,6 +265,7 @@ partial class FormCaja
 
         grpResumen.Controls.AddRange(new Control[]
         {
+            lblCapInicial, lblCapVentas, lblCapEntradas, lblCapSalidas, lblCapSaldo, lblLineaSaldo,
             lblMontoInicial, lblVentas, lblVentasOtros, lblEntradas, lblSalidas, lblSaldoEsperado, btnCerrarCaja
         });
 
@@ -232,7 +273,7 @@ partial class FormCaja
 
         // ── Tab Historial ────────────────────────────────────────────────
         dgvHistorial.Location = new Point(5, 8);
-        dgvHistorial.Size = new Size(760, 390);
+        dgvHistorial.Size = new Size(760, 445);
         dgvHistorial.ReadOnly = true;
         dgvHistorial.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         dgvHistorial.AllowUserToAddRows = false;
@@ -244,13 +285,13 @@ partial class FormCaja
         panelOperaciones.Controls.Add(tabCaja);
 
         // lblMensaje
-        lblMensaje.Location = new Point(12, 525);
+        lblMensaje.Location = new Point(12, 578);
         lblMensaje.Size = new Size(780, 20);
         lblMensaje.AutoSize = false;
 
         // Form
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(804, 555);
+        ClientSize = new Size(804, 608);
         Text = "Lácteos Madeline – Control de Caja";
         StartPosition = FormStartPosition.CenterParent;
 

@@ -95,7 +95,18 @@ public class VentaService
             return (false, "Seleccione un método de pago válido.", null);
         }
 
-        var total = Total;
+        // Revalidación de cada línea justo antes de guardar: ninguna venta
+        // con cantidades en cero o precios en cero/negativos (la base de
+        // datos lo vuelve a impedir con TR_DetalleVentas_Valido).
+        foreach (var linea in _carrito)
+        {
+            if (linea.Cantidad <= 0 || linea.PrecioUnitario <= 0)
+            {
+                return (false, $"La línea \"{linea.NombreProducto}\" tiene cantidad o precio inválido. Elimínela y agréguela de nuevo.", null);
+            }
+        }
+
+        var total = Math.Round(Total, 2, MidpointRounding.AwayFromZero);
         decimal? cambio = null;
 
         if (metodoPago == Venta.PagoEfectivo)
@@ -141,15 +152,21 @@ public class VentaService
             // Existencia insuficiente detectada dentro de la transacción (RN-05).
             return (false, $"{ex.Message} Verifique las existencias; la venta no se registró.", null);
         }
+        catch (Exception ex) when (ErroresBaseDatos.EsReglaDeIntegridad(ex))
+        {
+            LogHelper.Advertencia("Venta rechazada por regla de integridad", ex.Message);
+            return (false, $"{ErroresBaseDatos.MensajeAmigable(ex)} La venta no se registró.", null);
+        }
         catch (Exception ex)
         {
-            return (false, $"No se pudo registrar la venta. No se guardó ningún cambio.\nDetalle: {ex.Message}", null);
+            LogHelper.Error($"Confirmar venta (total {total:F2}, {_carrito.Count} líneas, {metodoPago})", ex);
+            return (false, $"No se pudo registrar la venta. No se guardó ningún cambio.\nDetalle: {ErroresBaseDatos.MensajeAmigable(ex)}", null);
         }
     }
 
     public static decimal CalcularCambio(decimal total, decimal montoRecibido)
     {
-        return montoRecibido - total;
+        return Math.Round(montoRecibido - total, 2, MidpointRounding.AwayFromZero);
     }
 
     public bool HayCajaAbierta()

@@ -77,7 +77,7 @@ partial class FormProductos
 
         // dgvProductos
         dgvProductos.Location = new Point(15, 50);
-        dgvProductos.Size = new Size(600, 220);
+        dgvProductos.Size = new Size(720, 220);
         dgvProductos.ReadOnly = true;
         dgvProductos.AllowUserToAddRows = false;
         dgvProductos.AllowUserToDeleteRows = false;
@@ -143,19 +143,19 @@ partial class FormProductos
 
         // btnNuevo
         btnNuevo.Location = new Point(15, 390);
-        btnNuevo.Size = new Size(90, 30);
+        btnNuevo.Size = new Size(90, 34);
         btnNuevo.Text = "Nuevo";
         btnNuevo.Click += btnNuevo_Click;
 
         // btnGuardar
         btnGuardar.Location = new Point(115, 390);
-        btnGuardar.Size = new Size(120, 30);
+        btnGuardar.Size = new Size(120, 34);
         btnGuardar.Text = "Guardar";
         btnGuardar.Click += btnGuardar_Click;
 
         // btnActivarDesactivar
         btnActivarDesactivar.Location = new Point(245, 390);
-        btnActivarDesactivar.Size = new Size(170, 30);
+        btnActivarDesactivar.Size = new Size(190, 34);
         btnActivarDesactivar.Text = "Activar / Desactivar";
         btnActivarDesactivar.Click += btnActivarDesactivar_Click;
 
@@ -167,7 +167,7 @@ partial class FormProductos
 
         // FormProductos
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(630, 465);
+        ClientSize = new Size(750, 465);
         Controls.Add(txtBuscar);
         Controls.Add(btnBuscar);
         Controls.Add(dgvProductos);
