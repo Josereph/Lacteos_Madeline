@@ -40,6 +40,7 @@ partial class FormCaja
     private GroupBox grpResumen;
     private Label lblMontoInicial;
     private Label lblVentas;
+    private Label lblVentasOtros;
     private Label lblEntradas;
     private Label lblSalidas;
     private Label lblSaldoEsperado;
@@ -79,6 +80,7 @@ partial class FormCaja
         btnRegistrarMovimiento = new Button();
         lblMontoInicial        = new Label();
         lblVentas              = new Label();
+        lblVentasOtros         = new Label();
         lblEntradas            = new Label();
         lblSalidas             = new Label();
         lblSaldoEsperado       = new Label();
@@ -210,6 +212,7 @@ partial class FormCaja
         lblEntradas.Location      = new Point(rx, ry + 36);  lblEntradas.Size      = new Size(340, 18); lblEntradas.Font      = fResumen; lblEntradas.Parent      = grpResumen;
         lblSalidas.Location       = new Point(rx, ry + 54);  lblSalidas.Size       = new Size(340, 18); lblSalidas.Font       = fResumen; lblSalidas.Parent       = grpResumen;
         lblSaldoEsperado.Location = new Point(rx, ry + 72);  lblSaldoEsperado.Size = new Size(340, 18); lblSaldoEsperado.Font = fResumenBold; lblSaldoEsperado.Parent = grpResumen;
+        lblVentasOtros.Location   = new Point(rx + 350, ry + 18); lblVentasOtros.Size = new Size(245, 54); lblVentasOtros.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic); lblVentasOtros.ForeColor = Color.DimGray; lblVentasOtros.Parent = grpResumen;
 
         btnCerrarCaja.Location = new Point(610, 35);
         btnCerrarCaja.Size = new Size(130, 45);
@@ -222,7 +225,7 @@ partial class FormCaja
 
         grpResumen.Controls.AddRange(new Control[]
         {
-            lblMontoInicial, lblVentas, lblEntradas, lblSalidas, lblSaldoEsperado, btnCerrarCaja
+            lblMontoInicial, lblVentas, lblVentasOtros, lblEntradas, lblSalidas, lblSaldoEsperado, btnCerrarCaja
         });
 
         tabJornada.Controls.AddRange(new Control[] { grpMovimiento, dgvMovimientos, grpResumen });

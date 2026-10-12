@@ -9,11 +9,17 @@ namespace LacteosMadeline.Data;
 /// </summary>
 public static class DatabaseConnection
 {
-    private static readonly string DatabaseFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LacteosMadeline");
+    // La variable de entorno LACTEOS_DB_PATH permite apuntar a otra base de
+    // datos (por ejemplo, para pruebas) sin tocar la base de datos del negocio.
+    private static readonly string DatabasePath =
+        Environment.GetEnvironmentVariable("LACTEOS_DB_PATH") is { Length: > 0 } rutaPersonalizada
+            ? Path.GetFullPath(rutaPersonalizada)
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LacteosMadeline",
+                "LacteosMadeline.db");
 
-    private static readonly string DatabasePath = Path.Combine(DatabaseFolder, "LacteosMadeline.db");
+    private static readonly string DatabaseFolder = Path.GetDirectoryName(DatabasePath)!;
 
     public static string ConnectionString => $"Data Source={DatabasePath}";
 

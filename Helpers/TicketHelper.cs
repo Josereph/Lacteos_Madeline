@@ -31,23 +31,47 @@ public static class TicketHelper
 
         sb.AppendLine("--------------------------------");
         sb.AppendLine($"TOTAL: {venta.Total:C2}");
+        sb.AppendLine($"Pago:     {venta.MetodoPago}");
+        if (venta.MontoRecibido is decimal recibido)
+        {
+            sb.AppendLine($"Recibido: {recibido:C2}");
+            sb.AppendLine($"Cambio:   {venta.Cambio ?? 0:C2}");
+        }
         sb.AppendLine("--------------------------------");
         sb.AppendLine("     Gracias por su compra.");
 
         return sb.ToString();
     }
 
-    public static void Imprimir(Venta venta)
+    /// <summary>
+    /// Envía el ticket a la impresora predeterminada. Si no hay impresora
+    /// instalada o falla la impresión, devuelve el motivo en lugar de
+    /// lanzar una excepción: la venta ya está registrada y no debe perderse.
+    /// </summary>
+    public static (bool Exitoso, string Mensaje) Imprimir(Venta venta)
     {
         var textoTicket = GenerarTexto(venta);
 
-        using var documento = new PrintDocument();
-        documento.PrintPage += (sender, e) =>
+        try
         {
-            using var fuente = new Font("Consolas", 10);
-            e.Graphics?.DrawString(textoTicket, fuente, Brushes.Black, 10, 10);
-        };
+            using var documento = new PrintDocument();
+            if (!documento.PrinterSettings.IsValid)
+            {
+                return (false, "No hay una impresora predeterminada configurada en Windows.");
+            }
 
-        documento.Print();
+            documento.PrintPage += (sender, e) =>
+            {
+                using var fuente = new Font("Consolas", 10);
+                e.Graphics?.DrawString(textoTicket, fuente, Brushes.Black, 10, 10);
+            };
+
+            documento.Print();
+            return (true, string.Empty);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
     }
 }

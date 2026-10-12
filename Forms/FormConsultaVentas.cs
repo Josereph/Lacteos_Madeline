@@ -42,6 +42,10 @@ public partial class FormConsultaVentas : Form
             dgvVentas.Columns["IdVenta"].HeaderText = "# Venta";
             dgvVentas.Columns["FechaHora"].HeaderText = "Fecha / Hora";
             dgvVentas.Columns["Total"].HeaderText = "Total";
+            dgvVentas.Columns["MetodoPago"].HeaderText = "Método de pago";
+            dgvVentas.Columns["MontoRecibido"].HeaderText = "Recibido";
+            dgvVentas.Columns["Cambio"].HeaderText = "Cambio";
+            dgvVentas.Columns["IdCaja"].HeaderText = "# Caja";
             dgvVentas.Columns["Detalles"].Visible = false;
         }
 
@@ -113,7 +117,12 @@ public partial class FormConsultaVentas : Form
 
         if (respuesta == DialogResult.Yes)
         {
-            TicketHelper.Imprimir(ventaCompleta);
+            var impresion = TicketHelper.Imprimir(ventaCompleta);
+            if (!impresion.Exitoso)
+            {
+                MessageBox.Show($"No se pudo imprimir el ticket.\n\n{impresion.Mensaje}",
+                    "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
 }

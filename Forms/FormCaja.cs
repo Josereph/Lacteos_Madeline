@@ -55,9 +55,12 @@ public partial class FormCaja : Form
 
     private void btnAbrir_Click(object? sender, EventArgs e)
     {
-        if (!decimal.TryParse(txtMontoInicial.Text.Trim(), out var monto))
+        // Campo vacío = fondo inicial de cero.
+        var textoMonto = txtMontoInicial.Text.Trim();
+        decimal monto = 0;
+        if (textoMonto.Length > 0 && !decimal.TryParse(textoMonto, out monto))
         {
-            MostrarMensaje("Ingrese un monto inicial válido.");
+            MostrarMensaje("Ingrese un monto inicial válido (solo números).");
             return;
         }
 
@@ -143,13 +146,15 @@ public partial class FormCaja : Form
                 $"RESUMEN DE CIERRE – Caja #{r.Caja.IdCaja}\n" +
                 $"────────────────────────────────\n" +
                 $"Monto inicial:        {r.Caja.MontoInicial:C2}\n" +
-                $"Ventas:              +{r.TotalVentas:C2}\n" +
+                $"Ventas en efectivo:  +{r.VentasEfectivo:C2}\n" +
                 $"Entradas manuales:   +{r.TotalEntradas:C2}\n" +
                 $"Salidas manuales:    -{r.TotalSalidas:C2}\n" +
                 $"────────────────────────────────\n" +
                 $"Saldo esperado:       {r.SaldoEsperado:C2}\n" +
                 $"Monto contado:        {montoFinal:C2}\n" +
-                $"Diferencia:           {diferencia:C2}",
+                $"Diferencia:           {diferencia:C2}\n\n" +
+                $"Ventas tarjeta/transferencia (no están en caja): {r.VentasOtrosMetodos:C2}\n" +
+                $"Total vendido en la jornada: {r.TotalVentas:C2}",
                 "Caja cerrada",
                 MessageBoxButtons.OK,
                 icono);
@@ -168,7 +173,8 @@ public partial class FormCaja : Form
         var resumen = _cajaService.ObtenerResumen(_idCajaActual);
 
         lblMontoInicial.Text  = $"Monto inicial:        {resumen.Caja.MontoInicial:C2}";
-        lblVentas.Text        = $"Ventas:              +{resumen.TotalVentas:C2}";
+        lblVentas.Text        = $"Ventas efectivo:     +{resumen.VentasEfectivo:C2}";
+        lblVentasOtros.Text   = $"Tarjeta / transferencia: {resumen.VentasOtrosMetodos:C2}\n(no suma al efectivo)\nTotal vendido: {resumen.TotalVentas:C2}";
         lblEntradas.Text      = $"Entradas:            +{resumen.TotalEntradas:C2}";
         lblSalidas.Text       = $"Salidas:             -{resumen.TotalSalidas:C2}";
         lblSaldoEsperado.Text = $"Saldo esperado:       {resumen.SaldoEsperado:C2}";

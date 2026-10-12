@@ -23,6 +23,9 @@ partial class FormVentas
     private Button btnEliminarLinea;
 
     private Label lblTotal;
+    private Label lblMetodoPago;
+    private ComboBox cboMetodoPago;
+    private Label lblCambio;
     private Button btnConfirmar;
     private Button btnCancelar;
     private Label lblMensaje;
@@ -41,6 +44,9 @@ partial class FormVentas
         btnEliminarLinea = new Button();
 
         lblTotal = new Label();
+        lblMetodoPago = new Label();
+        cboMetodoPago = new ComboBox();
+        lblCambio = new Label();
         btnConfirmar = new Button();
         btnCancelar = new Button();
         lblMensaje = new Label();
@@ -57,7 +63,10 @@ partial class FormVentas
         // cboProducto
         cboProducto.Location = new Point(90, 15);
         cboProducto.Size = new Size(300, 23);
-        cboProducto.DropDownStyle = ComboBoxStyle.DropDownList;
+        // Se puede escribir para buscar el producto por nombre (mostrador rápido).
+        cboProducto.DropDownStyle = ComboBoxStyle.DropDown;
+        cboProducto.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+        cboProducto.AutoCompleteSource = AutoCompleteSource.ListItems;
 
         // lblCantidad
         lblCantidad.AutoSize = true;
@@ -102,7 +111,7 @@ partial class FormVentas
         // btnConfirmar
         btnConfirmar.Location = new Point(15, 320);
         btnConfirmar.Size = new Size(160, 35);
-        btnConfirmar.Text = "Confirmar Venta";
+        btnConfirmar.Text = "Confirmar Venta (F12)";
         btnConfirmar.Click += btnConfirmar_Click;
 
         // btnCancelar
@@ -111,15 +120,33 @@ partial class FormVentas
         btnCancelar.Text = "Cancelar Venta";
         btnCancelar.Click += btnCancelar_Click;
 
+        // lblMetodoPago
+        lblMetodoPago.AutoSize = true;
+        lblMetodoPago.Location = new Point(360, 329);
+        lblMetodoPago.Text = "Pago:";
+
+        // cboMetodoPago
+        cboMetodoPago.Location = new Point(405, 325);
+        cboMetodoPago.Size = new Size(230, 23);
+        cboMetodoPago.DropDownStyle = ComboBoxStyle.DropDownList;
+
+        // lblCambio
+        lblCambio.AutoSize = false;
+        lblCambio.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+        lblCambio.ForeColor = Color.DarkGreen;
+        lblCambio.Location = new Point(15, 362);
+        lblCambio.Size = new Size(620, 26);
+
         // lblMensaje
-        lblMensaje.AutoSize = true;
+        lblMensaje.AutoSize = false;
         lblMensaje.ForeColor = Color.DarkRed;
-        lblMensaje.Location = new Point(15, 365);
-        lblMensaje.Size = new Size(620, 20);
+        lblMensaje.Location = new Point(15, 392);
+        lblMensaje.Size = new Size(620, 40);
 
         // FormVentas
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(650, 400);
+        ClientSize = new Size(650, 440);
+        KeyPreview = true;
         Controls.Add(lblProducto);
         Controls.Add(cboProducto);
         Controls.Add(lblCantidad);
@@ -128,6 +155,9 @@ partial class FormVentas
         Controls.Add(dgvCarrito);
         Controls.Add(btnEliminarLinea);
         Controls.Add(lblTotal);
+        Controls.Add(lblMetodoPago);
+        Controls.Add(cboMetodoPago);
+        Controls.Add(lblCambio);
         Controls.Add(btnConfirmar);
         Controls.Add(btnCancelar);
         Controls.Add(lblMensaje);

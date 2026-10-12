@@ -7,6 +7,26 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
+        Shown += Form1_Shown;
+    }
+
+    /// <summary>
+    /// Alerta de bajo inventario al iniciar la jornada.
+    /// </summary>
+    private void Form1_Shown(object? sender, EventArgs e)
+    {
+        var bajoStock = new LacteosMadeline.Services.InventarioService().ConsultarBajoStock();
+        if (bajoStock.Count == 0) return;
+
+        var lista = string.Join("\n", bajoStock.Take(15)
+            .Select(p => $"• {p.Nombre}: {p.Existencia} (mínimo {p.StockMinimo})"));
+        if (bajoStock.Count > 15) lista += $"\n… y {bajoStock.Count - 15} más (ver Reportes › Bajo Stock).";
+
+        MessageBox.Show(
+            $"Hay {bajoStock.Count} producto(s) con existencia igual o menor al stock mínimo:\n\n{lista}",
+            "Alerta de inventario bajo",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
     }
 
     // ── Fase 1 ──────────────────────────────────────────────────────────

@@ -5,20 +5,28 @@ namespace LacteosMadeline.Forms;
 /// Reemplaza la dependencia de Microsoft.VisualBasic.Interaction.InputBox
 /// con un diálogo nativo de WinForms (sección 26 lineamientos: mantener
 /// coherencia visual con el resto del sistema).
+/// Si se indica <c>totalAPagar</c>, el diálogo funciona como cobro en
+/// efectivo: muestra el cambio en vivo y no acepta montos menores al total
+/// (regla RN-12).
 /// </summary>
 public class FormInputMonto : Form
 {
     private Label _lblMensaje = null!;
     private TextBox _txtMonto = null!;
+    private Label _lblCambio = null!;
     private Button _btnAceptar = null!;
     private Button _btnCancelar = null!;
 
+    private readonly decimal? _totalAPagar;
+
     public decimal Monto { get; private set; }
 
-    public FormInputMonto(string titulo, string mensaje, decimal valorInicial = 0)
+    public FormInputMonto(string titulo, string mensaje, decimal valorInicial = 0, decimal? totalAPagar = null)
     {
+        _totalAPagar = totalAPagar;
+
         Text = titulo;
-        ClientSize = new Size(340, 130);
+        ClientSize = new Size(340, totalAPagar is null ? 130 : 165);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -27,8 +35,8 @@ public class FormInputMonto : Form
         _lblMensaje = new Label
         {
             Text = mensaje,
-            Location = new Point(12, 15),
-            Size = new Size(315, 20),
+            Location = new Point(12, 10),
+            Size = new Size(315, 30),
             AutoSize = false
         };
 
@@ -38,12 +46,22 @@ public class FormInputMonto : Form
             Size = new Size(315, 23),
             Text = valorInicial.ToString("F2")
         };
-        _txtMonto.SelectAll();
+
+        _lblCambio = new Label
+        {
+            Location = new Point(12, 72),
+            Size = new Size(315, 28),
+            AutoSize = false,
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+            Visible = totalAPagar is not null
+        };
+
+        var filaBotones = totalAPagar is null ? 78 : 115;
 
         _btnAceptar = new Button
         {
             Text = "Aceptar",
-            Location = new Point(150, 78),
+            Location = new Point(150, filaBotones),
             Size = new Size(85, 30),
             DialogResult = DialogResult.OK
         };
@@ -52,7 +70,7 @@ public class FormInputMonto : Form
         _btnCancelar = new Button
         {
             Text = "Cancelar",
-            Location = new Point(242, 78),
+            Location = new Point(242, filaBotones),
             Size = new Size(85, 30),
             DialogResult = DialogResult.Cancel
         };
@@ -60,7 +78,32 @@ public class FormInputMonto : Form
         AcceptButton = _btnAceptar;
         CancelButton = _btnCancelar;
 
-        Controls.AddRange(new Control[] { _lblMensaje, _txtMonto, _btnAceptar, _btnCancelar });
+        Controls.AddRange(new Control[] { _lblMensaje, _txtMonto, _lblCambio, _btnAceptar, _btnCancelar });
+
+        _txtMonto.TextChanged += (_, _) => ActualizarCambio();
+        Shown += (_, _) => { _txtMonto.Focus(); _txtMonto.SelectAll(); };
+        ActualizarCambio();
+    }
+
+    private void ActualizarCambio()
+    {
+        if (_totalAPagar is not decimal total) return;
+
+        if (!decimal.TryParse(_txtMonto.Text.Trim(), out var recibido))
+        {
+            _lblCambio.ForeColor = Color.DarkRed;
+            _lblCambio.Text = "Monto no válido";
+        }
+        else if (recibido < total)
+        {
+            _lblCambio.ForeColor = Color.DarkRed;
+            _lblCambio.Text = $"Faltan: {total - recibido:C2}";
+        }
+        else
+        {
+            _lblCambio.ForeColor = Color.DarkGreen;
+            _lblCambio.Text = $"Cambio: {recibido - total:C2}";
+        }
     }
 
     private void BtnAceptar_Click(object? sender, EventArgs e)
@@ -72,6 +115,15 @@ public class FormInputMonto : Form
             DialogResult = DialogResult.None; // Evitar que se cierre
             return;
         }
+
+        if (_totalAPagar is decimal total && valor < total)
+        {
+            MessageBox.Show($"El monto recibido no cubre el total de la venta ({total:C2}).",
+                "Monto insuficiente", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            DialogResult = DialogResult.None;
+            return;
+        }
+
         Monto = valor;
     }
 }

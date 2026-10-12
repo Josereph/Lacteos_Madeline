@@ -14,7 +14,50 @@ public static class DatabaseInitializer
         using var connection = DatabaseConnection.CreateConnection();
 
         CrearTablas(connection);
+        MigrarVentasMetodoPago(connection);
         SembrarDatosIniciales(connection);
+    }
+
+    /// <summary>
+    /// Agrega a Ventas las columnas de método de pago, monto recibido,
+    /// cambio y caja, en bases de datos creadas antes de este cambio.
+    /// Las ventas anteriores se marcan como "Efectivo" (así se contaban
+    /// en caja) y se asocian a la caja cuya jornada las contenía.
+    /// </summary>
+    private static void MigrarVentasMetodoPago(SqliteConnection connection)
+    {
+        if (ExisteColumna(connection, "Ventas", "MetodoPago"))
+        {
+            return;
+        }
+
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            ALTER TABLE Ventas ADD COLUMN MetodoPago TEXT NOT NULL DEFAULT 'Efectivo';
+            ALTER TABLE Ventas ADD COLUMN MontoRecibido REAL NULL;
+            ALTER TABLE Ventas ADD COLUMN Cambio REAL NULL;
+            ALTER TABLE Ventas ADD COLUMN IdCaja INTEGER NULL REFERENCES Cajas (IdCaja);
+
+            UPDATE Ventas
+            SET IdCaja = (
+                SELECT c.IdCaja FROM Cajas c
+                WHERE Ventas.FechaHora >= c.FechaApertura
+                  AND (c.FechaCierre IS NULL OR Ventas.FechaHora <= c.FechaCierre)
+                ORDER BY c.IdCaja DESC
+                LIMIT 1);
+            """;
+        command.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private static bool ExisteColumna(SqliteConnection connection, string tabla, string columna)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{tabla}') WHERE name = $columna;";
+        command.Parameters.AddWithValue("$columna", columna);
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
     private static void CrearTablas(SqliteConnection connection)

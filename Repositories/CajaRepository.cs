@@ -126,22 +126,25 @@ public class CajaRepository
     }
 
     /// <summary>
-    /// Total de ventas registradas entre dos fechas, para el cálculo
-    /// del saldo de caja (sección 13 lineamientos).
+    /// Totales de las ventas registradas en la caja indicada, separando
+    /// el efectivo (que sí entra físicamente a la gaveta) de los pagos con
+    /// tarjeta o transferencia (sección 13 lineamientos).
     /// </summary>
-    public decimal ObtenerTotalVentas(DateTime desde, DateTime hasta)
+    public (decimal Efectivo, decimal OtrosMetodos) ObtenerTotalesVentas(int idCaja)
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT COALESCE(SUM(Total), 0)
+            SELECT COALESCE(SUM(CASE WHEN MetodoPago = 'Efectivo' THEN Total END), 0),
+                   COALESCE(SUM(CASE WHEN MetodoPago <> 'Efectivo' THEN Total END), 0)
             FROM Ventas
-            WHERE FechaHora >= $desde AND FechaHora <= $hasta;
+            WHERE IdCaja = $idCaja;
             """;
-        command.Parameters.AddWithValue("$desde", desde.ToString("yyyy-MM-dd HH:mm:ss"));
-        command.Parameters.AddWithValue("$hasta", hasta.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("$idCaja", idCaja);
 
-        return Convert.ToDecimal(command.ExecuteScalar());
+        using var reader = command.ExecuteReader();
+        reader.Read();
+        return (reader.GetDecimal(0), reader.GetDecimal(1));
     }
 
     private static Caja Mapear(SqliteDataReader reader)

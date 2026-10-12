@@ -31,13 +31,30 @@ public partial class FormReportes : Form
 
     private void GenerarReporteActivo()
     {
-        switch (tabReportes.SelectedIndex)
+        MostrarMensaje(string.Empty, esError: false);
+
+        if (dtpDesde.Value.Date > dtpHasta.Value.Date)
         {
-            case 0: GenerarVentas(); break;
-            case 1: GenerarCompras(); break;
-            case 2: GenerarInventario(); break;
-            case 3: GenerarBajoStock(); break;
-            case 4: GenerarCaja(); break;
+            MostrarMensaje("La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'.");
+            return;
+        }
+
+        try
+        {
+            switch (tabReportes.SelectedIndex)
+            {
+                case 0: GenerarVentas(); break;
+                case 1: GenerarCompras(); break;
+                case 2: GenerarInventario(); break;
+                case 3: GenerarBajoStock(); break;
+                case 4: GenerarCaja(); break;
+                case 5: GenerarMasVendidos(); break;
+            }
+        }
+        catch (Exception ex)
+        {
+            dgvReporte.DataSource = null;
+            MostrarMensaje($"No se pudo generar el reporte: {ex.Message}");
         }
     }
 
@@ -48,7 +65,28 @@ public partial class FormReportes : Form
         dgvReporte.DataSource = datos;
 
         AjustarColumnas("IdVenta", "# Venta", "FechaHora", "Fecha / Hora",
+                        "MetodoPago", "Método de pago",
                         "Total", "Total", "Acumulado", "Acumulado");
+
+        MostrarMensaje(
+            $"{datos.Count} venta(s)  |  Total: {datos.Sum(d => d.Total):C2}  |  " +
+            $"Efectivo: {datos.Where(d => d.MetodoPago == Models.Venta.PagoEfectivo).Sum(d => d.Total):C2}",
+            esError: false);
+    }
+
+    private void GenerarMasVendidos()
+    {
+        var datos = _reporteService.ProductosMasVendidos(dtpDesde.Value.Date, dtpHasta.Value.Date);
+        dgvReporte.DataSource = null;
+        dgvReporte.DataSource = datos;
+
+        AjustarColumnas("Posicion", "#", "Producto", "Producto",
+                        "UnidadesVendidas", "Unidades vendidas", "TotalVendido", "Total vendido",
+                        "NumeroVentas", "N.º de ventas", "ExistenciaActual", "Existencia actual");
+
+        MostrarMensaje(datos.Count == 0
+            ? "No hay ventas en el rango de fechas seleccionado."
+            : $"{datos.Count} producto(s) vendidos en el período.", esError: false);
     }
 
     private void GenerarCompras()
@@ -137,7 +175,8 @@ public partial class FormReportes : Form
                 MostrarMensaje(
                     $"Caja #{cajaAbierta.IdCaja} ABIERTA  |  " +
                     $"Monto inicial: {resumen.Caja.MontoInicial:C2}  |  " +
-                    $"Ventas: {resumen.TotalVentas:C2}  |  " +
+                    $"Ventas efectivo: {resumen.VentasEfectivo:C2}  |  " +
+                    $"Tarjeta/transf.: {resumen.VentasOtrosMetodos:C2}  |  " +
                     $"Entradas: {resumen.TotalEntradas:C2}  |  " +
                     $"Salidas: {resumen.TotalSalidas:C2}  |  " +
                     $"Saldo esperado: {resumen.SaldoEsperado:C2}",

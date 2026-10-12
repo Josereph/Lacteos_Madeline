@@ -25,6 +25,7 @@ partial class FormReportes
     private TabPage tabInventario;
     private TabPage tabBajoStock;
     private TabPage tabCaja;
+    private TabPage tabMasVendidos;
     private DataGridView dgvReporte;
     private Label lblMensaje;
 
@@ -45,6 +46,7 @@ partial class FormReportes
         tabInventario = new TabPage();
         tabBajoStock = new TabPage();
         tabCaja      = new TabPage();
+        tabMasVendidos = new TabPage();
         dgvReporte   = new DataGridView();
         lblMensaje   = new Label();
 
@@ -89,10 +91,11 @@ partial class FormReportes
         tabInventario.Text = "Inventario";
         tabBajoStock.Text = "Bajo Stock";
         tabCaja.Text      = "Caja";
+        tabMasVendidos.Text = "Más vendidos";
 
         tabReportes.Location = new Point(12, 85);
         tabReportes.Size = new Size(760, 35);
-        tabReportes.TabPages.AddRange(new TabPage[] { tabVentas, tabCompras, tabInventario, tabBajoStock, tabCaja });
+        tabReportes.TabPages.AddRange(new TabPage[] { tabVentas, tabCompras, tabInventario, tabBajoStock, tabCaja, tabMasVendidos });
         tabReportes.SelectedIndexChanged += tabReportes_SelectedIndexChanged;
 
         // DataGridView — fuera del TabControl para mantener acceso directo

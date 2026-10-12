@@ -44,12 +44,16 @@ public class VentaRepository
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO Ventas (FechaHora, Total)
-            VALUES ($fechaHora, $total);
+            INSERT INTO Ventas (FechaHora, Total, MetodoPago, MontoRecibido, Cambio, IdCaja)
+            VALUES ($fechaHora, $total, $metodoPago, $montoRecibido, $cambio, $idCaja);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$fechaHora", venta.FechaHora.ToString("yyyy-MM-dd HH:mm:ss"));
         command.Parameters.AddWithValue("$total", venta.Total);
+        command.Parameters.AddWithValue("$metodoPago", venta.MetodoPago);
+        command.Parameters.AddWithValue("$montoRecibido", (object?)venta.MontoRecibido ?? DBNull.Value);
+        command.Parameters.AddWithValue("$cambio", (object?)venta.Cambio ?? DBNull.Value);
+        command.Parameters.AddWithValue("$idCaja", (object?)venta.IdCaja ?? DBNull.Value);
 
         return Convert.ToInt32(command.ExecuteScalar());
     }
@@ -79,18 +83,13 @@ public class VentaRepository
 
         using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT IdVenta, FechaHora, Total FROM Ventas WHERE IdVenta = $id;";
+            command.CommandText = $"SELECT {ColumnasVenta} FROM Ventas WHERE IdVenta = $id;";
             command.Parameters.AddWithValue("$id", idVenta);
 
             using var reader = command.ExecuteReader();
             if (reader.Read())
             {
-                venta = new Venta
-                {
-                    IdVenta = reader.GetInt32(0),
-                    FechaHora = DateTime.Parse(reader.GetString(1)),
-                    Total = reader.GetDecimal(2)
-                };
+                venta = MapearVenta(reader);
             }
         }
 
@@ -132,19 +131,33 @@ public class VentaRepository
 
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT IdVenta, FechaHora, Total FROM Ventas ORDER BY IdVenta DESC;";
+        command.CommandText = $"SELECT {ColumnasVenta} FROM Ventas ORDER BY IdVenta DESC;";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            ventas.Add(new Venta
-            {
-                IdVenta = reader.GetInt32(0),
-                FechaHora = DateTime.Parse(reader.GetString(1)),
-                Total = reader.GetDecimal(2)
-            });
+            ventas.Add(MapearVenta(reader));
         }
 
         return ventas;
+    }
+
+    /// <summary>
+    /// Columnas de Ventas en el orden que espera MapearVenta.
+    /// </summary>
+    public const string ColumnasVenta = "IdVenta, FechaHora, Total, MetodoPago, MontoRecibido, Cambio, IdCaja";
+
+    public static Venta MapearVenta(SqliteDataReader reader)
+    {
+        return new Venta
+        {
+            IdVenta = reader.GetInt32(0),
+            FechaHora = DateTime.Parse(reader.GetString(1)),
+            Total = reader.GetDecimal(2),
+            MetodoPago = reader.GetString(3),
+            MontoRecibido = reader.IsDBNull(4) ? null : reader.GetDecimal(4),
+            Cambio = reader.IsDBNull(5) ? null : reader.GetDecimal(5),
+            IdCaja = reader.IsDBNull(6) ? null : reader.GetInt32(6)
+        };
     }
 }
