@@ -1,4 +1,5 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using Microsoft.Data.Sqlite;
 
@@ -8,9 +9,21 @@ namespace LacteosMadeline.Repositories;
 /// Acceso a datos para la tabla Productos. Las consultas incluyen el
 /// nombre de la categoría mediante un JOIN para facilitar su uso directo
 /// en la interfaz.
+///
+/// La existencia solo cambia por movimientos con registro propio: ventas,
+/// compras, mermas o un ajuste (<see cref="AjustarExistencia"/>). Modificar
+/// los datos del producto nunca la toca.
 /// </summary>
 public class ProductoRepository
 {
+    private const string ColumnasProducto = """
+        p.IdProducto, p.Nombre, p.IdCategoria, c.Nombre, p.PrecioCompra,
+        p.PrecioVenta, p.Existencia, p.StockMinimo, p.Estado
+        """;
+
+    /// <summary>
+    /// Registra un producto nuevo. Su existencia inicial se guarda tal cual.
+    /// </summary>
     public int Registrar(Producto producto)
     {
         using var connection = DatabaseConnection.CreateConnection();
@@ -21,10 +34,17 @@ public class ProductoRepository
             SELECT last_insert_rowid();
             """;
         AgregarParametros(command, producto);
+        command.Parameters.AddWithValue("$existencia", producto.Existencia);
 
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
+    /// <summary>
+    /// Actualiza nombre, categoría, precios, stock mínimo y estado. La
+    /// existencia NO se modifica aquí: si el formulario tenía un valor viejo
+    /// (por ejemplo, se vendió mientras se editaba), sobrescribirla borraría
+    /// esos movimientos. Para corregirla use <see cref="AjustarExistencia"/>.
+    /// </summary>
     public void Modificar(Producto producto)
     {
         using var connection = DatabaseConnection.CreateConnection();
@@ -35,14 +55,17 @@ public class ProductoRepository
                 IdCategoria = $idCategoria,
                 PrecioCompra = $precioCompra,
                 PrecioVenta = $precioVenta,
-                Existencia = $existencia,
                 StockMinimo = $stockMinimo,
                 Estado = $estado
             WHERE IdProducto = $id;
             """;
         AgregarParametros(command, producto);
         command.Parameters.AddWithValue("$id", producto.IdProducto);
-        command.ExecuteNonQuery();
+
+        if (command.ExecuteNonQuery() == 0)
+        {
+            throw new ReglaNegocioException("El producto ya no existe.");
+        }
     }
 
     public void CambiarEstado(int idProducto, bool estado)
@@ -61,9 +84,8 @@ public class ProductoRepository
 
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT p.IdProducto, p.Nombre, p.IdCategoria, c.Nombre, p.PrecioCompra,
-                   p.PrecioVenta, p.Existencia, p.StockMinimo, p.Estado
+        command.CommandText = $"""
+            SELECT {ColumnasProducto}
             FROM Productos p
             INNER JOIN Categorias c ON c.IdCategoria = p.IdCategoria
             WHERE p.Nombre LIKE $filtro
@@ -86,9 +108,8 @@ public class ProductoRepository
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT p.IdProducto, p.Nombre, p.IdCategoria, c.Nombre, p.PrecioCompra,
-                   p.PrecioVenta, p.Existencia, p.StockMinimo, p.Estado
+        command.CommandText = $"""
+            SELECT {ColumnasProducto}
             FROM Productos p
             INNER JOIN Categorias c ON c.IdCategoria = p.IdCategoria
             WHERE p.IdProducto = $id;
@@ -121,7 +142,7 @@ public class ProductoRepository
         var filasAfectadas = command.ExecuteNonQuery();
         if (filasAfectadas == 0)
         {
-            throw new InvalidOperationException("Existencia insuficiente.");
+            throw new ReglaNegocioException("Existencia insuficiente.");
         }
     }
 
@@ -139,31 +160,81 @@ public class ProductoRepository
 
         if (command.ExecuteNonQuery() == 0)
         {
-            throw new InvalidOperationException($"El producto #{idProducto} ya no existe.");
+            throw new ReglaNegocioException($"El producto #{idProducto} ya no existe.");
         }
     }
 
     /// <summary>
-    /// Ajuste manual de existencia (conteo físico). Se ejecuta en una
-    /// transacción y el trigger TR_Productos_ExistenciaNoNegativa_Upd
-    /// impide dejar el stock en negativo.
+    /// Ajuste manual de existencia (conteo físico o corrección). Lee el valor
+    /// actual, lo cambia y registra el ajuste en AjustesInventario, todo en
+    /// una sola transacción (BEGIN IMMEDIATE: nadie más escribe en medio).
+    /// Si se indica <paramref name="existenciaEsperada"/> y la existencia
+    /// real ya es otra (hubo una venta o compra mientras se editaba), el
+    /// ajuste se rechaza para no borrar ese movimiento.
+    /// Devuelve la existencia anterior.
     /// </summary>
-    public void AjustarExistencia(int idProducto, int nuevaExistencia)
+    public int AjustarExistencia(int idProducto, int nuevaExistencia, string motivo, int? existenciaEsperada = null)
     {
         using var connection = DatabaseConnection.CreateConnection();
         using var transaction = connection.BeginTransaction();
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "UPDATE Productos SET Existencia = $existencia WHERE IdProducto = $id;";
-        command.Parameters.AddWithValue("$existencia", nuevaExistencia);
-        command.Parameters.AddWithValue("$id", idProducto);
 
-        if (command.ExecuteNonQuery() == 0)
+        string nombre;
+        int anterior;
+        using (var consulta = connection.CreateCommand())
         {
-            throw new InvalidOperationException("El producto no existe.");
+            consulta.Transaction = transaction;
+            consulta.CommandText = "SELECT Nombre, Existencia FROM Productos WHERE IdProducto = $id;";
+            consulta.Parameters.AddWithValue("$id", idProducto);
+
+            using var reader = consulta.ExecuteReader();
+            if (!reader.Read())
+            {
+                throw new ReglaNegocioException("El producto no existe.");
+            }
+
+            nombre = reader.GetString(0);
+            anterior = reader.GetInt32(1);
+        }
+
+        if (existenciaEsperada is int esperada && esperada != anterior)
+        {
+            throw new ReglaNegocioException(
+                $"La existencia de \"{nombre}\" cambió mientras se editaba (ahora es {anterior}). " +
+                "Revise el valor y vuelva a intentarlo.");
+        }
+
+        if (anterior == nuevaExistencia)
+        {
+            return anterior;
+        }
+
+        using (var actualizar = connection.CreateCommand())
+        {
+            actualizar.Transaction = transaction;
+            actualizar.CommandText = "UPDATE Productos SET Existencia = $existencia WHERE IdProducto = $id;";
+            actualizar.Parameters.AddWithValue("$existencia", nuevaExistencia);
+            actualizar.Parameters.AddWithValue("$id", idProducto);
+            actualizar.ExecuteNonQuery();
+        }
+
+        using (var registrar = connection.CreateCommand())
+        {
+            registrar.Transaction = transaction;
+            registrar.CommandText = """
+                INSERT INTO AjustesInventario (FechaHora, IdProducto, NombreProducto, ExistenciaAnterior, ExistenciaNueva, Motivo)
+                VALUES ($fechaHora, $id, $nombre, $anterior, $nueva, $motivo);
+                """;
+            registrar.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(DateTime.Now));
+            registrar.Parameters.AddWithValue("$id", idProducto);
+            registrar.Parameters.AddWithValue("$nombre", nombre);
+            registrar.Parameters.AddWithValue("$anterior", anterior);
+            registrar.Parameters.AddWithValue("$nueva", nuevaExistencia);
+            registrar.Parameters.AddWithValue("$motivo", motivo);
+            registrar.ExecuteNonQuery();
         }
 
         transaction.Commit();
+        return anterior;
     }
 
     /// <summary>
@@ -178,9 +249,8 @@ public class ProductoRepository
 
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT p.IdProducto, p.Nombre, p.IdCategoria, c.Nombre, p.PrecioCompra,
-                   p.PrecioVenta, p.Existencia, p.StockMinimo, p.Estado
+        command.CommandText = $"""
+            SELECT {ColumnasProducto}
             FROM Productos p
             INNER JOIN Categorias c ON c.IdCategoria = p.IdCategoria
             WHERE p.Estado = 1
@@ -201,9 +271,8 @@ public class ProductoRepository
     {
         command.Parameters.AddWithValue("$nombre", producto.Nombre);
         command.Parameters.AddWithValue("$idCategoria", producto.IdCategoria);
-        command.Parameters.AddWithValue("$precioCompra", (object?)producto.PrecioCompra ?? DBNull.Value);
-        command.Parameters.AddWithValue("$precioVenta", producto.PrecioVenta);
-        command.Parameters.AddWithValue("$existencia", producto.Existencia);
+        command.Parameters.AddWithValue("$precioCompra", Dinero.ACentavos(producto.PrecioCompra));
+        command.Parameters.AddWithValue("$precioVenta", Dinero.ACentavos(producto.PrecioVenta));
         command.Parameters.AddWithValue("$stockMinimo", producto.StockMinimo);
         command.Parameters.AddWithValue("$estado", producto.Estado ? 1 : 0);
     }
@@ -216,8 +285,8 @@ public class ProductoRepository
             Nombre = reader.GetString(1),
             IdCategoria = reader.GetInt32(2),
             NombreCategoria = reader.GetString(3),
-            PrecioCompra = reader.IsDBNull(4) ? null : reader.GetDecimal(4),
-            PrecioVenta = reader.GetDecimal(5),
+            PrecioCompra = reader.LeerDineroONulo(4),
+            PrecioVenta = reader.LeerDinero(5),
             Existencia = reader.GetInt32(6),
             StockMinimo = reader.GetInt32(7),
             Estado = reader.GetInt32(8) == 1

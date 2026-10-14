@@ -1,5 +1,5 @@
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
+using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
 
@@ -13,7 +13,7 @@ namespace LacteosMadeline.Forms;
 /// </summary>
 public partial class FormCategorias : Form
 {
-    private readonly CategoriaRepository _categoriaRepository = new();
+    private readonly CategoriaService _categoriaService = new();
     private int _idSeleccionada;
 
     public FormCategorias()
@@ -31,16 +31,16 @@ public partial class FormCategorias : Form
 
     private void CargarCategorias()
     {
-        var categorias = _categoriaRepository.ObtenerTodas();
+        var categorias = _categoriaService.ObtenerTodas();
 
         dgvCategorias.DataSource = null;
         dgvCategorias.DataSource = categorias;
 
         if (dgvCategorias.Columns["IdCategoria"] != null)
         {
-            dgvCategorias.Columns["IdCategoria"].HeaderText = "Id";
-            dgvCategorias.Columns["Nombre"].HeaderText = "Nombre";
-            dgvCategorias.Columns["Estado"].HeaderText = "Activa";
+            dgvCategorias.Encabezado("IdCategoria", "Id");
+            dgvCategorias.Encabezado("Nombre", "Nombre");
+            dgvCategorias.Encabezado("Estado", "Activa");
         }
     }
 
@@ -65,41 +65,16 @@ public partial class FormCategorias : Form
 
     private void btnGuardar_Click(object? sender, EventArgs e)
     {
-        var nombre = txtNombre.Text.Trim();
-
-        if (string.IsNullOrWhiteSpace(nombre))
+        var resultado = _categoriaService.Guardar(_idSeleccionada, txtNombre.Text);
+        if (!resultado.Exitoso)
         {
-            MostrarMensaje("Debe ingresar el nombre de la categoría.");
+            MostrarMensaje(resultado.Mensaje);
             return;
-        }
-
-        if (_categoriaRepository.ExisteNombre(nombre, _idSeleccionada))
-        {
-            MostrarMensaje("Ya existe una categoría con ese nombre.");
-            return;
-        }
-
-        if (_idSeleccionada == 0)
-        {
-            _categoriaRepository.Registrar(new Categoria { Nombre = nombre, Estado = true });
-            MostrarMensaje("Categoría registrada correctamente.", esError: false);
-        }
-        else
-        {
-            var categoria = _categoriaRepository.ObtenerPorId(_idSeleccionada);
-            if (categoria is null)
-            {
-                MostrarMensaje("La categoría seleccionada ya no existe.");
-                return;
-            }
-
-            categoria.Nombre = nombre;
-            _categoriaRepository.Modificar(categoria);
-            MostrarMensaje("Categoría modificada correctamente.", esError: false);
         }
 
         btnNuevo_Click(sender, e);
         CargarCategorias();
+        MostrarMensaje(resultado.Mensaje, esError: false);
     }
 
     private void btnActivarDesactivar_Click(object? sender, EventArgs e)
@@ -110,14 +85,9 @@ public partial class FormCategorias : Form
             return;
         }
 
-        var categoria = _categoriaRepository.ObtenerPorId(_idSeleccionada);
-        if (categoria is null)
-        {
-            return;
-        }
-
-        _categoriaRepository.CambiarEstado(categoria.IdCategoria, !categoria.Estado);
+        var resultado = _categoriaService.AlternarEstado(_idSeleccionada);
         CargarCategorias();
+        MostrarMensaje(resultado.Mensaje, esError: !resultado.Exitoso);
     }
 
     private void MostrarMensaje(string mensaje, bool esError = true)

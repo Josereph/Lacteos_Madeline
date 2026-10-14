@@ -1,5 +1,5 @@
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
+using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
 
@@ -13,7 +13,7 @@ namespace LacteosMadeline.Forms;
 /// </summary>
 public partial class FormProveedores : Form
 {
-    private readonly ProveedorRepository _proveedorRepository = new();
+    private readonly ProveedorService _proveedorService = new();
     private int _idSeleccionado;
 
     public FormProveedores()
@@ -31,20 +31,20 @@ public partial class FormProveedores : Form
 
     private void CargarProveedores(string filtro = "")
     {
-        var proveedores = _proveedorRepository.Buscar(filtro);
+        var proveedores = _proveedorService.Buscar(filtro);
 
         dgvProveedores.DataSource = null;
         dgvProveedores.DataSource = proveedores;
 
         if (dgvProveedores.Columns["IdProveedor"] != null)
         {
-            dgvProveedores.Columns["IdProveedor"].Visible = false;
-            dgvProveedores.Columns["Nombre"].HeaderText = "Nombre";
-            dgvProveedores.Columns["Contacto"].HeaderText = "Contacto";
-            dgvProveedores.Columns["Telefono"].HeaderText = "Teléfono";
-            dgvProveedores.Columns["Direccion"].HeaderText = "Dirección";
-            dgvProveedores.Columns["Observaciones"].HeaderText = "Observaciones";
-            dgvProveedores.Columns["Estado"].HeaderText = "Activo";
+            dgvProveedores.OcultarColumna("IdProveedor");
+            dgvProveedores.Encabezado("Nombre", "Nombre");
+            dgvProveedores.Encabezado("Contacto", "Contacto");
+            dgvProveedores.Encabezado("Telefono", "Teléfono");
+            dgvProveedores.Encabezado("Direccion", "Dirección");
+            dgvProveedores.Encabezado("Observaciones", "Observaciones");
+            dgvProveedores.Encabezado("Estado", "Activo");
         }
     }
 
@@ -80,44 +80,27 @@ public partial class FormProveedores : Form
 
     private void btnGuardar_Click(object? sender, EventArgs e)
     {
-        var nombre = txtNombre.Text.Trim();
-        if (string.IsNullOrWhiteSpace(nombre))
-        {
-            MostrarMensaje("El nombre del proveedor es obligatorio.");
-            return;
-        }
-
         var proveedor = new Proveedor
         {
             IdProveedor   = _idSeleccionado,
-            Nombre        = nombre,
-            Contacto      = string.IsNullOrWhiteSpace(txtContacto.Text) ? null : txtContacto.Text.Trim(),
-            Telefono      = string.IsNullOrWhiteSpace(txtTelefono.Text) ? null : txtTelefono.Text.Trim(),
-            Direccion     = string.IsNullOrWhiteSpace(txtDireccion.Text) ? null : txtDireccion.Text.Trim(),
-            Observaciones = string.IsNullOrWhiteSpace(txtObservaciones.Text) ? null : txtObservaciones.Text.Trim(),
+            Nombre        = txtNombre.Text,
+            Contacto      = txtContacto.Text,
+            Telefono      = txtTelefono.Text,
+            Direccion     = txtDireccion.Text,
+            Observaciones = txtObservaciones.Text,
             Estado        = true
         };
 
-        try
+        var resultado = _proveedorService.Guardar(proveedor);
+        if (!resultado.Exitoso)
         {
-            if (_idSeleccionado == 0)
-            {
-                _proveedorRepository.Registrar(proveedor);
-                MostrarMensaje("Proveedor registrado correctamente.", esError: false);
-            }
-            else
-            {
-                _proveedorRepository.Modificar(proveedor);
-                MostrarMensaje("Proveedor modificado correctamente.", esError: false);
-            }
+            MostrarMensaje(resultado.Mensaje);
+            return;
+        }
 
-            btnNuevo_Click(sender, e);
-            CargarProveedores(txtBuscar.Text.Trim());
-        }
-        catch (Exception ex)
-        {
-            MostrarMensaje($"Error al guardar: {ex.Message}");
-        }
+        btnNuevo_Click(sender, e);
+        CargarProveedores(txtBuscar.Text.Trim());
+        MostrarMensaje(resultado.Mensaje, esError: false);
     }
 
     private void btnActivarDesactivar_Click(object? sender, EventArgs e)
@@ -128,12 +111,9 @@ public partial class FormProveedores : Form
             return;
         }
 
-        var proveedor = _proveedorRepository.ObtenerPorId(_idSeleccionado);
-        if (proveedor is null) return;
-
-        _proveedorRepository.CambiarEstado(_idSeleccionado, !proveedor.Estado);
+        var resultado = _proveedorService.AlternarEstado(_idSeleccionado);
         CargarProveedores(txtBuscar.Text.Trim());
-        MostrarMensaje($"Proveedor {(proveedor.Estado ? "desactivado" : "activado")} correctamente.", esError: false);
+        MostrarMensaje(resultado.Mensaje, esError: !resultado.Exitoso);
     }
 
     private void MostrarMensaje(string mensaje, bool esError = true)

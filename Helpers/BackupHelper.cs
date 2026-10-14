@@ -97,6 +97,25 @@ public static class BackupHelper
     }
 
     /// <summary>
+    /// Respaldo verificado antes de actualizar la estructura de la base de
+    /// datos. Va a Respaldos\Migraciones, fuera de la limpieza automática,
+    /// porque es el punto de retorno si una actualización sale mal.
+    /// </summary>
+    public static (bool Exitoso, string Detalle, string Ruta) RealizarBackupAntesDeMigrar(int versionActual, int versionDestino)
+    {
+        var ruta = Path.Combine(CarpetaRespaldosAutomaticos, "Migraciones",
+            $"{PrefijoArchivo}{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_v{versionActual}-a-v{versionDestino}.db");
+
+        var resultado = RealizarBackup(ruta);
+        if (resultado.Exitoso)
+        {
+            LogHelper.Info("Respaldo previo a migración", ruta);
+        }
+
+        return (resultado.Exitoso, resultado.Detalle, ruta);
+    }
+
+    /// <summary>
     /// Genera un nombre de archivo sugerido con fecha y hora actuales.
     /// Ejemplo: LacteosMadeline_backup_2026-09-05_15-30-00.db
     /// </summary>

@@ -1,6 +1,6 @@
 using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
+using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
 
@@ -12,7 +12,7 @@ namespace LacteosMadeline.Forms;
 /// </summary>
 public partial class FormConsultaVentas : Form
 {
-    private readonly VentaRepository _ventaRepository = new();
+    private readonly VentaService _ventaService = new();
 
     public FormConsultaVentas()
     {
@@ -43,13 +43,13 @@ public partial class FormConsultaVentas : Form
 
         if (dgvVentas.Columns.Count > 0 && dgvVentas.Columns["IdVenta"] != null)
         {
-            dgvVentas.Columns["IdVenta"].HeaderText = "# Venta";
-            dgvVentas.Columns["FechaHora"].HeaderText = "Fecha / Hora";
-            dgvVentas.Columns["Total"].HeaderText = "Total";
-            dgvVentas.Columns["MetodoPago"].HeaderText = "Método de pago";
-            dgvVentas.Columns["MontoRecibido"].HeaderText = "Recibido";
-            dgvVentas.Columns["Cambio"].HeaderText = "Cambio";
-            dgvVentas.Columns["IdCaja"].HeaderText = "# Caja";
+            dgvVentas.Encabezado("IdVenta", "# Venta");
+            dgvVentas.Encabezado("FechaHora", "Fecha / Hora");
+            dgvVentas.Encabezado("Total", "Total");
+            dgvVentas.Encabezado("MetodoPago", "Método de pago");
+            dgvVentas.Encabezado("MontoRecibido", "Recibido");
+            dgvVentas.Encabezado("Cambio", "Cambio");
+            dgvVentas.Encabezado("IdCaja", "# Caja");
             if (dgvVentas.Columns["Detalles"] is { } colDetalles) colDetalles.Visible = false;
         }
 
@@ -63,18 +63,18 @@ public partial class FormConsultaVentas : Form
         // lugar de cargar todo el historial en memoria y filtrar aquí.
         if (nudIdVenta.Value > 0)
         {
-            var venta = _ventaRepository.ObtenerPorId((int)nudIdVenta.Value);
+            var venta = _ventaService.ObtenerPorId((int)nudIdVenta.Value);
             return venta is null ? new List<Venta>() : new List<Venta> { venta };
         }
 
-        return _ventaRepository.ObtenerPorRango(dtpDesde.Value.Date, dtpHasta.Value.Date);
+        return _ventaService.ConsultarPorRango(dtpDesde.Value.Date, dtpHasta.Value.Date);
     }
 
     private void dgvVentas_SelectionChanged(object? sender, EventArgs e)
     {
         if (dgvVentas.CurrentRow?.DataBoundItem is not Venta venta) return;
 
-        var ventaCompleta = _ventaRepository.ObtenerPorId(venta.IdVenta);
+        var ventaCompleta = _ventaService.ObtenerPorId(venta.IdVenta);
         if (ventaCompleta is null) return;
 
         dgvDetalle.DataSource = null;
@@ -82,13 +82,13 @@ public partial class FormConsultaVentas : Form
 
         if (dgvDetalle.Columns.Count > 0 && dgvDetalle.Columns["IdDetalleVenta"] != null)
         {
-            dgvDetalle.Columns["IdDetalleVenta"].Visible = false;
-            dgvDetalle.Columns["IdVenta"].Visible = false;
-            dgvDetalle.Columns["IdProducto"].Visible = false;
-            dgvDetalle.Columns["NombreProducto"].HeaderText = "Producto";
-            dgvDetalle.Columns["Cantidad"].HeaderText = "Cantidad";
-            dgvDetalle.Columns["PrecioUnitario"].HeaderText = "Precio Unit.";
-            dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal";
+            dgvDetalle.OcultarColumna("IdDetalleVenta");
+            dgvDetalle.OcultarColumna("IdVenta");
+            dgvDetalle.OcultarColumna("IdProducto");
+            dgvDetalle.Encabezado("NombreProducto", "Producto");
+            dgvDetalle.Encabezado("Cantidad", "Cantidad");
+            dgvDetalle.Encabezado("PrecioUnitario", "Precio Unit.");
+            dgvDetalle.Encabezado("Subtotal", "Subtotal");
         }
     }
 
@@ -101,7 +101,7 @@ public partial class FormConsultaVentas : Form
             return;
         }
 
-        var ventaCompleta = _ventaRepository.ObtenerPorId(venta.IdVenta);
+        var ventaCompleta = _ventaService.ObtenerPorId(venta.IdVenta);
         if (ventaCompleta is null) return;
 
         var texto = TicketHelper.GenerarTexto(ventaCompleta);

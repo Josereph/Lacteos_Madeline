@@ -1,3 +1,4 @@
+using LacteosMadeline.Helpers;
 using Microsoft.Data.Sqlite;
 
 namespace LacteosMadeline.Repositories;
@@ -17,7 +18,7 @@ internal static class RangoFechas
 
     public static void AgregarParametros(SqliteCommand command, DateTime? desde, DateTime? hasta)
     {
-        command.Parameters.AddWithValue("$desde", desde?.ToString("yyyy-MM-dd 00:00:00") ?? Minimo);
-        command.Parameters.AddWithValue("$hasta", hasta?.ToString("yyyy-MM-dd 23:59:59") ?? Maximo);
+        command.Parameters.AddWithValue("$desde", desde is DateTime d ? Fechas.InicioDelDia(d) : Minimo);
+        command.Parameters.AddWithValue("$hasta", hasta is DateTime h ? Fechas.FinDelDia(h) : Maximo);
     }
 }

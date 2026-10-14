@@ -1,25 +1,68 @@
+using LacteosMadeline.Data.Migraciones;
 using Microsoft.Data.Sqlite;
 
 namespace LacteosMadeline.Data;
 
 /// <summary>
-/// Crea la estructura de la base de datos si todavía no existe y deja
-/// información inicial mínima (la categoría "Otros"), de acuerdo con el
-/// modelo de datos definido en la documentación del proyecto.
+/// Crea o actualiza la estructura de la base de datos al iniciar el sistema
+/// mediante migraciones numeradas (PRAGMA user_version), ejecutadas por
+/// <see cref="MigradorBaseDatos"/>.
+///
+/// Para cambiar la estructura en una versión futura:
+///  - Cree una clase en Data/Migraciones (p. ej. V4Clientes.cs) y agréguela
+///    al final de <see cref="Migraciones"/> con el siguiente número. Nunca
+///    modifique una migración ya entregada: las bases en uso ya la
+///    aplicaron y no volverán a ejecutarla.
+///  - Use siempre el connection y la transaction recibidos.
+///  - Montos: columnas INTEGER en centavos (ver V2DineroEnCentavos y Helpers/Dinero).
+///  - Para cambiar el tipo de una columna, reconstruya la tabla (crear
+///    tabla nueva, copiar datos, eliminar la vieja, renombrar); las llaves
+///    foráneas se verifican al final de la migración. Elimine antes los
+///    triggers que mencionen la tabla y vuelva a crearlos al final.
 /// </summary>
 public static class DatabaseInitializer
 {
+    internal static readonly IReadOnlyList<Migracion> Migraciones = new Migracion[]
+    {
+        // v1 reúne la estructura previa al versionado. Todas sus sentencias
+        // son idempotentes, por lo que también lleva a v1 las bases que ya
+        // estaban en uso (user_version = 0) sin perder información.
+        new(1, "Estructura base (productos, ventas, compras, caja, mermas, índices y reglas de integridad)", AplicarEstructuraBase),
+        new(2, "Montos en centavos enteros", V2DineroEnCentavos.Aplicar),
+        new(3, "Registro de ajustes de inventario", V3AjustesInventario.Aplicar),
+    };
+
+    /// <summary>
+    /// Versión de estructura que espera este programa.
+    /// </summary>
+    public static int VersionEsquema => Migraciones[^1].Version;
+
     public static void Inicializar()
     {
-        using var connection = DatabaseConnection.CreateConnection();
+        using (var connection = DatabaseConnection.CreateConnection())
+        {
+            ActivarWal(connection);
+        }
 
-        ActivarWal(connection);
-        CrearTablas(connection);
-        MigrarVentasMetodoPago(connection);
-        MigrarCajasCierre(connection);
-        CrearIndices(connection);
-        CrearReglasIntegridad(connection);
-        SembrarDatosIniciales(connection);
+        MigradorBaseDatos.Aplicar(Migraciones);
+    }
+
+    private static void AplicarEstructuraBase(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        CrearTablas(connection, transaction);
+        MigrarVentasMetodoPago(connection, transaction);
+        MigrarCajasCierre(connection, transaction);
+        CrearIndices(connection, transaction);
+        CrearReglasIntegridad(connection, transaction);
+        SembrarDatosIniciales(connection, transaction);
+    }
+
+    private static void Ejecutar(SqliteConnection connection, SqliteTransaction transaction, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -40,22 +83,17 @@ public static class DatabaseInitializer
     /// momento del cierre, para que el arqueo quede registrado y no dependa
     /// de recalcularlo después.
     /// </summary>
-    private static void MigrarCajasCierre(SqliteConnection connection)
+    private static void MigrarCajasCierre(SqliteConnection connection, SqliteTransaction transaction)
     {
-        if (ExisteColumna(connection, "Cajas", "MontoEsperado"))
+        if (ExisteColumna(connection, transaction, "Cajas", "MontoEsperado"))
         {
             return;
         }
 
-        using var transaction = connection.BeginTransaction();
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        Ejecutar(connection, transaction, """
             ALTER TABLE Cajas ADD COLUMN MontoEsperado REAL NULL;
             ALTER TABLE Cajas ADD COLUMN Diferencia REAL NULL;
-            """;
-        command.ExecuteNonQuery();
-        transaction.Commit();
+            """);
     }
 
     /// <summary>
@@ -63,10 +101,9 @@ public static class DatabaseInitializer
     /// rangos de fechas en ventas/compras/mermas, totales por caja y
     /// detalle por venta/producto (reporte de más vendidos).
     /// </summary>
-    private static void CrearIndices(SqliteConnection connection)
+    private static void CrearIndices(SqliteConnection connection, SqliteTransaction transaction)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = """
+        Ejecutar(connection, transaction, """
             CREATE INDEX IF NOT EXISTS IX_Productos_Estado_Nombre ON Productos (Estado, Nombre);
             CREATE INDEX IF NOT EXISTS IX_Productos_Categoria     ON Productos (IdCategoria);
             CREATE INDEX IF NOT EXISTS IX_Ventas_FechaHora        ON Ventas (FechaHora);
@@ -82,8 +119,7 @@ public static class DatabaseInitializer
 
             -- Solo puede existir UNA caja abierta: lo garantiza la propia base.
             CREATE UNIQUE INDEX IF NOT EXISTS UX_Cajas_UnaAbierta ON Cajas (Estado) WHERE Estado = 'Abierta';
-            """;
-        command.ExecuteNonQuery();
+            """);
     }
 
     /// <summary>
@@ -92,10 +128,9 @@ public static class DatabaseInitializer
     /// validaciones de los servicios. Si se violan, la operación completa
     /// se revierte (RAISE ABORT dentro de la transacción).
     /// </summary>
-    private static void CrearReglasIntegridad(SqliteConnection connection)
+    private static void CrearReglasIntegridad(SqliteConnection connection, SqliteTransaction transaction)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = """
+        Ejecutar(connection, transaction, """
             CREATE TRIGGER IF NOT EXISTS TR_Productos_ExistenciaNoNegativa_Upd
             BEFORE UPDATE OF Existencia ON Productos
             WHEN NEW.Existencia < 0
@@ -139,8 +174,7 @@ public static class DatabaseInitializer
             BEFORE UPDATE ON Cajas
             WHEN OLD.Estado = 'Cerrada'
             BEGIN SELECT RAISE(ABORT, 'La caja ya está cerrada y no puede modificarse.'); END;
-            """;
-        command.ExecuteNonQuery();
+            """);
     }
 
     /// <summary>
@@ -149,17 +183,14 @@ public static class DatabaseInitializer
     /// Las ventas anteriores se marcan como "Efectivo" (así se contaban
     /// en caja) y se asocian a la caja cuya jornada las contenía.
     /// </summary>
-    private static void MigrarVentasMetodoPago(SqliteConnection connection)
+    private static void MigrarVentasMetodoPago(SqliteConnection connection, SqliteTransaction transaction)
     {
-        if (ExisteColumna(connection, "Ventas", "MetodoPago"))
+        if (ExisteColumna(connection, transaction, "Ventas", "MetodoPago"))
         {
             return;
         }
 
-        using var transaction = connection.BeginTransaction();
-        using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
+        Ejecutar(connection, transaction, """
             ALTER TABLE Ventas ADD COLUMN MetodoPago TEXT NOT NULL DEFAULT 'Efectivo';
             ALTER TABLE Ventas ADD COLUMN MontoRecibido REAL NULL;
             ALTER TABLE Ventas ADD COLUMN Cambio REAL NULL;
@@ -172,22 +203,21 @@ public static class DatabaseInitializer
                   AND (c.FechaCierre IS NULL OR Ventas.FechaHora <= c.FechaCierre)
                 ORDER BY c.IdCaja DESC
                 LIMIT 1);
-            """;
-        command.ExecuteNonQuery();
-        transaction.Commit();
+            """);
     }
 
-    private static bool ExisteColumna(SqliteConnection connection, string tabla, string columna)
+    private static bool ExisteColumna(SqliteConnection connection, SqliteTransaction transaction, string tabla, string columna)
     {
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{tabla}') WHERE name = $columna;";
         command.Parameters.AddWithValue("$columna", columna);
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
-    private static void CrearTablas(SqliteConnection connection)
+    private static void CrearTablas(SqliteConnection connection, SqliteTransaction transaction)
     {
-        const string script = """
+        Ejecutar(connection, transaction, """
             CREATE TABLE IF NOT EXISTS Categorias (
                 IdCategoria INTEGER PRIMARY KEY AUTOINCREMENT,
                 Nombre TEXT NOT NULL UNIQUE,
@@ -286,17 +316,11 @@ public static class DatabaseInitializer
                 Observacion    TEXT NULL,
                 FOREIGN KEY (IdProducto) REFERENCES Productos (IdProducto)
             );
-            """;
-
-        using var command = connection.CreateCommand();
-        command.CommandText = script;
-        command.ExecuteNonQuery();
+            """);
     }
 
-    private static void SembrarDatosIniciales(SqliteConnection connection)
+    private static void SembrarDatosIniciales(SqliteConnection connection, SqliteTransaction transaction)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = "INSERT OR IGNORE INTO Categorias (Nombre, Estado) VALUES ('Otros', 1);";
-        command.ExecuteNonQuery();
+        Ejecutar(connection, transaction, "INSERT OR IGNORE INTO Categorias (Nombre, Estado) VALUES ('Otros', 1);");
     }
 }

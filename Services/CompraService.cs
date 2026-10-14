@@ -40,6 +40,11 @@ public class CompraService
             return (false, valCosto.Mensaje);
         }
 
+        if (Dinero.TieneMasDeDosDecimales(costoUnitario))
+        {
+            return (false, "El costo no puede tener más de dos decimales.");
+        }
+
         var producto = _productoRepository.ObtenerPorId(idProducto);
         if (producto is null)
         {
@@ -110,12 +115,36 @@ public class CompraService
         }
         catch (Exception ex)
         {
-            if (!ErroresBaseDatos.EsReglaDeIntegridad(ex) && ex is not InvalidOperationException)
+            if (!ErroresBaseDatos.EsReglaDeIntegridad(ex) && ex is not ReglaNegocioException)
             {
                 LogHelper.Error($"Confirmar compra (proveedor #{idProveedor}, total {compra.Total:F2})", ex);
             }
 
             return (false, $"No se pudo registrar la compra. No se guardó ningún cambio.\nDetalle: {ErroresBaseDatos.MensajeAmigable(ex)}", null);
         }
+    }
+
+    // ── Consultas de compras registradas ────────────────────────────────
+
+    /// <summary>Compras del rango de fechas, más recientes primero.</summary>
+    public List<Compra> ConsultarHistorial(DateTime? desde = null, DateTime? hasta = null)
+    {
+        return _compraRepository.ObtenerHistorial(desde, hasta);
+    }
+
+    /// <summary>Compra con su detalle, o null si no existe.</summary>
+    public Compra? ObtenerPorId(int idCompra)
+    {
+        return _compraRepository.ObtenerPorId(idCompra);
+    }
+
+    public List<Producto> ProductosActivos()
+    {
+        return _productoRepository.Buscar(soloActivos: true);
+    }
+
+    public List<Proveedor> ProveedoresActivos()
+    {
+        return _proveedorRepository.Buscar(soloActivos: true);
     }
 }

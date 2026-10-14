@@ -1,4 +1,4 @@
-using LacteosMadeline.Repositories;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
@@ -13,7 +13,6 @@ namespace LacteosMadeline.Forms;
 public partial class FormCaja : Form
 {
     private readonly CajaService _cajaService = new();
-    private readonly CajaRepository _cajaRepository = new();
     private int _idCajaActual;
 
     public FormCaja()
@@ -62,7 +61,7 @@ public partial class FormCaja : Form
         // Campo vacío = fondo inicial de cero.
         var textoMonto = txtMontoInicial.Text.Trim();
         decimal monto = 0;
-        if (textoMonto.Length > 0 && !decimal.TryParse(textoMonto, out monto))
+        if (textoMonto.Length > 0 && !Dinero.TryParse(textoMonto, out monto))
         {
             MostrarMensaje("Ingrese un monto inicial válido (solo números).");
             return;
@@ -91,7 +90,7 @@ public partial class FormCaja : Form
 
         var tipo = rbEntrada.Checked ? "Entrada" : "Salida";
 
-        if (!decimal.TryParse(txtMonto.Text.Trim(), out var monto))
+        if (!Dinero.TryParse(txtMonto.Text, out var monto))
         {
             MostrarMensaje("Ingrese un monto válido.");
             return;
@@ -187,12 +186,12 @@ public partial class FormCaja : Form
 
         if (dgvMovimientos.Columns.Count > 0 && dgvMovimientos.Columns["IdMovimiento"] != null)
         {
-            dgvMovimientos.Columns["IdMovimiento"].Visible = false;
-            dgvMovimientos.Columns["IdCaja"].Visible = false;
-            dgvMovimientos.Columns["FechaHora"].HeaderText = "Fecha / Hora";
-            dgvMovimientos.Columns["Tipo"].HeaderText = "Tipo";
-            dgvMovimientos.Columns["Monto"].HeaderText = "Monto";
-            dgvMovimientos.Columns["Descripcion"].HeaderText = "Descripción";
+            dgvMovimientos.OcultarColumna("IdMovimiento");
+            dgvMovimientos.OcultarColumna("IdCaja");
+            dgvMovimientos.Encabezado("FechaHora", "Fecha / Hora");
+            dgvMovimientos.Encabezado("Tipo", "Tipo");
+            dgvMovimientos.Encabezado("Monto", "Monto");
+            dgvMovimientos.Encabezado("Descripcion", "Descripción");
         }
     }
 
@@ -200,21 +199,21 @@ public partial class FormCaja : Form
 
     private void CargarHistorialCajas()
     {
-        var historial = _cajaRepository.ObtenerHistorial();
+        var historial = _cajaService.ObtenerHistorial();
 
         dgvHistorial.DataSource = null;
         dgvHistorial.DataSource = historial;
 
         if (dgvHistorial.Columns.Count > 0 && dgvHistorial.Columns["IdCaja"] != null)
         {
-            dgvHistorial.Columns["IdCaja"].HeaderText = "# Caja";
-            dgvHistorial.Columns["FechaApertura"].HeaderText = "Apertura";
-            dgvHistorial.Columns["MontoInicial"].HeaderText = "Monto Inicial";
-            dgvHistorial.Columns["FechaCierre"].HeaderText = "Cierre";
-            dgvHistorial.Columns["MontoFinal"].HeaderText = "Monto Contado";
-            dgvHistorial.Columns["MontoEsperado"].HeaderText = "Monto Esperado";
-            dgvHistorial.Columns["Diferencia"].HeaderText = "Diferencia";
-            dgvHistorial.Columns["Estado"].HeaderText = "Estado";
+            dgvHistorial.Encabezado("IdCaja", "# Caja");
+            dgvHistorial.Encabezado("FechaApertura", "Apertura");
+            dgvHistorial.Encabezado("MontoInicial", "Monto Inicial");
+            dgvHistorial.Encabezado("FechaCierre", "Cierre");
+            dgvHistorial.Encabezado("MontoFinal", "Monto Contado");
+            dgvHistorial.Encabezado("MontoEsperado", "Monto Esperado");
+            dgvHistorial.Encabezado("Diferencia", "Diferencia");
+            dgvHistorial.Encabezado("Estado", "Estado");
         }
 
         // La lista de movimientos no se muestra en el historial; según el

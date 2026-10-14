@@ -1,0 +1,31 @@
+LACTEOS MADELINE - INSTALACION
+==============================
+
+1. Descomprima este archivo .zip en cualquier carpeta (por ejemplo, Descargas).
+2. Abra la carpeta y haga doble clic en  Instalar.cmd
+3. Listo: el programa se abre solo y queda un acceso directo en el
+   Escritorio y en el menu Inicio.
+
+No necesita instalar .NET ni tener permisos de administrador.
+Funciona en Windows 10 y Windows 11 de 64 bits.
+
+Si Windows muestra "Windows protegio su PC", elija "Mas informacion" y
+luego "Ejecutar de todas formas" (el programa no esta firmado digitalmente).
+
+ACTUALIZAR
+  Ejecute Instalar.cmd del paquete nuevo. La base de datos, los respaldos
+  y el historial se conservan.
+
+DESINSTALAR
+  Ejecute Desinstalar.cmd. Los datos se conservan en:
+  %LOCALAPPDATA%\LacteosMadeline
+
+DONDE ESTAN LOS DATOS
+  Base de datos, respaldos y registro de errores:
+  %LOCALAPPDATA%\LacteosMadeline
+  (pegue esa ruta en la barra del Explorador de archivos)
+
+  Para pasar los datos a otra PC: en el programa use "Respaldo de datos",
+  copie el archivo .db a la otra PC y reemplace con el
+  %LOCALAPPDATA%\LacteosMadeline\LacteosMadeline.db de esa PC
+  (con el programa cerrado).

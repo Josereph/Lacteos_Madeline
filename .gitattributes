@@ -1,0 +1,22 @@
+# Fin de línea consistente en cualquier PC, sin importar core.autocrlf.
+* text=auto
+
+# Código y proyectos: Git los normaliza; Windows los recibe con CRLF.
+*.cs      text diff=csharp
+*.csproj  text
+*.slnx    text
+*.json    text
+*.md      text
+*.txt     text eol=crlf
+
+# Scripts de Windows: cmd.exe y PowerShell 5.1 fallan con finales LF.
+*.cmd     text eol=crlf
+*.bat     text eol=crlf
+*.ps1     text eol=crlf
+
+# Binarios
+*.db      binary
+*.ico     binary
+*.png     binary
+*.jpg     binary
+*.zip     binary

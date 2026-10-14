@@ -33,7 +33,7 @@ public class CajaService
                 return (false, "Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.", null);
             }
 
-            var idCaja = _cajaRepository.AbrirCaja(Redondear(montoInicial));
+            var idCaja = _cajaRepository.AbrirCaja(Dinero.Redondear(montoInicial));
             return (true, "Caja abierta correctamente.", _cajaRepository.ObtenerPorId(idCaja));
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // UX_Cajas_UnaAbierta
@@ -52,6 +52,12 @@ public class CajaService
         return _cajaRepository.ObtenerCajaAbierta();
     }
 
+    /// <summary>Todas las cajas, de la más reciente a la más antigua.</summary>
+    public List<Caja> ObtenerHistorial()
+    {
+        return _cajaRepository.ObtenerHistorial();
+    }
+
     public (bool Exitoso, string Mensaje) RegistrarMovimiento(int idCaja, string tipo, decimal monto, string? descripcion)
     {
         var valMonto = Validaciones.ValidarMonto(monto);
@@ -65,7 +71,7 @@ public class CajaService
             return (false, "El tipo de movimiento debe ser 'Entrada' o 'Salida'.");
         }
 
-        if (Redondear(monto) != monto)
+        if (Dinero.TieneMasDeDosDecimales(monto))
         {
             return (false, "El monto no puede tener más de dos decimales.");
         }
@@ -85,7 +91,7 @@ public class CajaService
 
             return (true, "Movimiento registrado correctamente.");
         }
-        catch (InvalidOperationException ex)
+        catch (ReglaNegocioException ex)
         {
             return (false, ex.Message);
         }
@@ -99,7 +105,7 @@ public class CajaService
     public ResumenCaja ObtenerResumen(int idCaja)
     {
         var caja = _cajaRepository.ObtenerPorId(idCaja)
-            ?? throw new InvalidOperationException("Caja no encontrada.");
+            ?? throw new ReglaNegocioException("Caja no encontrada.");
 
         var totales = _cajaRepository.ObtenerTotales(idCaja)!;
 
@@ -129,13 +135,13 @@ public class CajaService
             return (false, "El monto contado no puede ser negativo.", null);
         }
 
-        montoFinal = Redondear(montoFinal);
+        montoFinal = Dinero.Redondear(montoFinal);
 
         try
         {
             _cajaRepository.CerrarCaja(idCaja, montoFinal);
         }
-        catch (InvalidOperationException ex)
+        catch (ReglaNegocioException ex)
         {
             return (false, ex.Message, null);
         }
@@ -156,8 +162,6 @@ public class CajaService
 
         return (true, mensaje, resumen);
     }
-
-    private static decimal Redondear(decimal valor) => Math.Round(valor, 2, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>

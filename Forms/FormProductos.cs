@@ -1,5 +1,5 @@
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
 using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
@@ -14,9 +14,14 @@ namespace LacteosMadeline.Forms;
 public partial class FormProductos : Form
 {
     private readonly ProductoService _productoService = new();
-    private readonly CategoriaRepository _categoriaRepository = new();
+    private readonly InventarioService _inventarioService = new();
 
     private int _idSeleccionado;
+
+    // Existencia que se mostró al seleccionar el producto. Si el usuario la
+    // cambia, se registra un ajuste; si mientras tanto hubo una venta o una
+    // compra, el ajuste se rechaza en lugar de borrar ese movimiento.
+    private int _existenciaMostrada;
 
     public FormProductos()
     {
@@ -34,7 +39,7 @@ public partial class FormProductos : Form
 
     private void CargarCategorias()
     {
-        var categorias = _categoriaRepository.ObtenerTodas(incluirInactivas: false);
+        var categorias = _productoService.CategoriasActivas();
         cboCategoria.DisplayMember = "Nombre";
         cboCategoria.ValueMember = "IdCategoria";
         cboCategoria.DataSource = categorias;
@@ -49,14 +54,14 @@ public partial class FormProductos : Form
 
         if (dgvProductos.Columns["IdCategoria"] != null)
         {
-            dgvProductos.Columns["IdCategoria"].Visible = false;
-            dgvProductos.Columns["IdProducto"].HeaderText = "#";
-            dgvProductos.Columns["NombreCategoria"].HeaderText = "Categoría";
-            dgvProductos.Columns["PrecioCompra"].HeaderText = "P. Compra";
-            dgvProductos.Columns["PrecioVenta"].HeaderText = "P. Venta";
-            dgvProductos.Columns["Existencia"].HeaderText = "Existencia";
-            dgvProductos.Columns["StockMinimo"].HeaderText = "Stock Mín.";
-            dgvProductos.Columns["Estado"].HeaderText = "Activo";
+            dgvProductos.OcultarColumna("IdCategoria");
+            dgvProductos.Encabezado("IdProducto", "#");
+            dgvProductos.Encabezado("NombreCategoria", "Categoría");
+            dgvProductos.Encabezado("PrecioCompra", "P. Compra");
+            dgvProductos.Encabezado("PrecioVenta", "P. Venta");
+            dgvProductos.Encabezado("Existencia", "Existencia");
+            dgvProductos.Encabezado("StockMinimo", "Stock Mín.");
+            dgvProductos.Encabezado("Estado", "Activo");
         }
     }
 
@@ -73,10 +78,11 @@ public partial class FormProductos : Form
         }
 
         _idSeleccionado = producto.IdProducto;
+        _existenciaMostrada = producto.Existencia;
         txtNombre.Text = producto.Nombre;
         cboCategoria.SelectedValue = producto.IdCategoria;
-        txtPrecioCompra.Text = producto.PrecioCompra?.ToString() ?? string.Empty;
-        txtPrecioVenta.Text = producto.PrecioVenta.ToString();
+        txtPrecioCompra.Text = producto.PrecioCompra is decimal compra ? Dinero.ParaEditar(compra) : string.Empty;
+        txtPrecioVenta.Text = Dinero.ParaEditar(producto.PrecioVenta);
         txtExistencia.Text = producto.Existencia.ToString();
         txtStockMinimo.Text = producto.StockMinimo.ToString();
     }
@@ -84,6 +90,7 @@ public partial class FormProductos : Form
     private void btnNuevo_Click(object? sender, EventArgs e)
     {
         _idSeleccionado = 0;
+        _existenciaMostrada = 0;
         txtNombre.Clear();
         txtPrecioCompra.Clear();
         txtPrecioVenta.Clear();
@@ -104,7 +111,7 @@ public partial class FormProductos : Form
         decimal? precioCompra = null;
         if (!string.IsNullOrWhiteSpace(txtPrecioCompra.Text))
         {
-            if (!decimal.TryParse(txtPrecioCompra.Text, out var valorPrecioCompra))
+            if (!Dinero.TryParse(txtPrecioCompra.Text, out var valorPrecioCompra))
             {
                 MostrarMensaje("El precio de compra ingresado no es válido.");
                 return;
@@ -112,7 +119,7 @@ public partial class FormProductos : Form
             precioCompra = valorPrecioCompra;
         }
 
-        if (!decimal.TryParse(txtPrecioVenta.Text, out var precioVenta))
+        if (!Dinero.TryParse(txtPrecioVenta.Text, out var precioVenta))
         {
             MostrarMensaje("El precio de venta ingresado no es válido.");
             return;
@@ -151,6 +158,11 @@ public partial class FormProductos : Form
         else
         {
             resultado = _productoService.Modificar(producto);
+
+            if (resultado.Exitoso && existencia != _existenciaMostrada)
+            {
+                resultado = AjustarExistencia(producto.Nombre, existencia);
+            }
         }
 
         MostrarMensaje(resultado.Mensaje, esError: !resultado.Exitoso);
@@ -160,6 +172,31 @@ public partial class FormProductos : Form
             btnNuevo_Click(sender, e);
             CargarProductos(txtBuscar.Text.Trim());
         }
+    }
+
+    /// <summary>
+    /// Cambiar la existencia de un producto ya registrado es un ajuste de
+    /// inventario: se confirma con el usuario y queda registrado con su motivo.
+    /// </summary>
+    private (bool Exitoso, string Mensaje) AjustarExistencia(string nombreProducto, int nuevaExistencia)
+    {
+        var respuesta = MessageBox.Show(this,
+            $"Los datos de \"{nombreProducto}\" se guardaron.\n\n" +
+            $"También cambió la existencia de {_existenciaMostrada} a {nuevaExistencia}. " +
+            "Esto se registrará como un ajuste de inventario.\n\n¿Desea aplicar el ajuste?",
+            "Ajuste de inventario", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+
+        if (respuesta != DialogResult.Yes)
+        {
+            return (true, "Producto modificado. La existencia no se cambió.");
+        }
+
+        var ajuste = _inventarioService.AjustarExistencia(_idSeleccionado, nuevaExistencia,
+            InventarioService.MotivoCorreccionProducto, existenciaEsperada: _existenciaMostrada);
+
+        return ajuste.Exitoso
+            ? (true, $"Producto modificado. {ajuste.Mensaje}")
+            : (false, $"Producto modificado, pero la existencia no se ajustó: {ajuste.Mensaje}");
     }
 
     private void btnActivarDesactivar_Click(object? sender, EventArgs e)

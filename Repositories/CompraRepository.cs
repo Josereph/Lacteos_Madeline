@@ -1,4 +1,5 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using Microsoft.Data.Sqlite;
 
@@ -49,9 +50,9 @@ public class CompraRepository
             VALUES ($fechaHora, $idProveedor, $total);
             SELECT last_insert_rowid();
             """;
-        command.Parameters.AddWithValue("$fechaHora", compra.FechaHora.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(compra.FechaHora));
         command.Parameters.AddWithValue("$idProveedor", compra.IdProveedor);
-        command.Parameters.AddWithValue("$total", compra.Total);
+        command.Parameters.AddWithValue("$total", Dinero.ACentavos(compra.Total));
 
         return Convert.ToInt32(command.ExecuteScalar());
     }
@@ -68,8 +69,8 @@ public class CompraRepository
         command.Parameters.AddWithValue("$idProducto", detalle.IdProducto);
         command.Parameters.AddWithValue("$nombreProducto", detalle.NombreProducto);
         command.Parameters.AddWithValue("$cantidad", detalle.Cantidad);
-        command.Parameters.AddWithValue("$costoUnitario", detalle.CostoUnitario);
-        command.Parameters.AddWithValue("$subtotal", detalle.Subtotal);
+        command.Parameters.AddWithValue("$costoUnitario", Dinero.ACentavos(detalle.CostoUnitario));
+        command.Parameters.AddWithValue("$subtotal", Dinero.ACentavos(detalle.Subtotal));
         command.ExecuteNonQuery();
     }
 
@@ -95,10 +96,10 @@ public class CompraRepository
                 compra = new Compra
                 {
                     IdCompra       = reader.GetInt32(0),
-                    FechaHora      = DateTime.Parse(reader.GetString(1)),
+                    FechaHora      = Fechas.DesdeBaseDatos(reader.GetString(1)),
                     IdProveedor    = reader.GetInt32(2),
                     NombreProveedor = reader.GetString(3),
-                    Total          = reader.GetDecimal(4)
+                    Total          = reader.LeerDinero(4)
                 };
             }
         }
@@ -124,7 +125,7 @@ public class CompraRepository
                     IdProducto      = reader.GetInt32(2),
                     NombreProducto  = reader.GetString(3),
                     Cantidad        = reader.GetInt32(4),
-                    CostoUnitario   = reader.GetDecimal(5)
+                    CostoUnitario   = reader.LeerDinero(5)
                 });
             }
         }
@@ -153,10 +154,10 @@ public class CompraRepository
             compras.Add(new Compra
             {
                 IdCompra        = reader.GetInt32(0),
-                FechaHora       = DateTime.Parse(reader.GetString(1)),
+                FechaHora       = Fechas.DesdeBaseDatos(reader.GetString(1)),
                 IdProveedor     = reader.GetInt32(2),
                 NombreProveedor = reader.GetString(3),
-                Total           = reader.GetDecimal(4)
+                Total           = reader.LeerDinero(4)
             });
         }
 

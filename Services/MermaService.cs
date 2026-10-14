@@ -62,15 +62,19 @@ public class MermaService
             merma.IdMerma = _mermaRepository.Registrar(merma);
             return (true, $"Baja registrada: {cantidad} × {producto.Nombre} ({motivo}). Inventario actualizado.", merma);
         }
-        catch (InvalidOperationException ex)
+        catch (ReglaNegocioException ex)
         {
             // Existencia insuficiente detectada dentro de la transacción.
             return (false, $"{ex.Message} La baja no se registró.", null);
         }
+        catch (Exception ex) when (ErroresBaseDatos.EsReglaDeIntegridad(ex))
+        {
+            return (false, $"{ErroresBaseDatos.MensajeAmigable(ex)} La baja no se registró.", null);
+        }
         catch (Exception ex)
         {
             LogHelper.Error($"Registro de merma (producto #{idProducto}, cantidad {cantidad})", ex);
-            return (false, $"No se pudo registrar la baja. No se guardó ningún cambio.\nDetalle: {ex.Message}", null);
+            return (false, $"No se pudo registrar la baja. No se guardó ningún cambio.\nDetalle: {ErroresBaseDatos.MensajeAmigable(ex)}", null);
         }
     }
 

@@ -76,6 +76,26 @@ public static class Diseno
             control.Anchor = anclaje;
         }
     }
+
+    // Las columnas de las tablas se generan a partir de las propiedades del
+    // modelo enlazado. Estas utilidades las ajustan por nombre y no hacen
+    // nada si la columna no existe (por ejemplo, si la tabla está vacía o
+    // el modelo cambió), en lugar de fallar con NullReferenceException.
+
+    public static void Encabezado(this DataGridView tabla, string columna, string texto)
+    {
+        if (tabla.Columns[columna] is { } c) c.HeaderText = texto;
+    }
+
+    public static void OcultarColumna(this DataGridView tabla, string columna)
+    {
+        if (tabla.Columns[columna] is { } c) c.Visible = false;
+    }
+
+    public static void FormatoColumna(this DataGridView tabla, string columna, string formato)
+    {
+        if (tabla.Columns[columna] is { } c) c.DefaultCellStyle.Format = formato;
+    }
 }
 
 /// <summary>

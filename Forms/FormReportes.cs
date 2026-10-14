@@ -123,11 +123,11 @@ public partial class FormReportes : Form
         OcultarColumna("Detalles");
         if (dgvReporte.Columns["IdCompra"] != null)
         {
-            dgvReporte.Columns["IdCompra"].HeaderText = "# Compra";
-            dgvReporte.Columns["FechaHora"].HeaderText = "Fecha / Hora";
-            dgvReporte.Columns["IdProveedor"].Visible = false;
-            dgvReporte.Columns["NombreProveedor"].HeaderText = "Proveedor";
-            dgvReporte.Columns["Total"].HeaderText = "Total";
+            dgvReporte.Encabezado("IdCompra", "# Compra");
+            dgvReporte.Encabezado("FechaHora", "Fecha / Hora");
+            dgvReporte.OcultarColumna("IdProveedor");
+            dgvReporte.Encabezado("NombreProveedor", "Proveedor");
+            dgvReporte.Encabezado("Total", "Total");
         }
     }
 
@@ -141,13 +141,13 @@ public partial class FormReportes : Form
         OcultarColumna("IdCategoria");
         if (dgvReporte.Columns["Nombre"] != null)
         {
-            dgvReporte.Columns["Nombre"].HeaderText = "Producto";
-            dgvReporte.Columns["NombreCategoria"].HeaderText = "Categoría";
-            dgvReporte.Columns["PrecioCompra"].HeaderText = "P. Compra";
-            dgvReporte.Columns["PrecioVenta"].HeaderText = "P. Venta";
-            dgvReporte.Columns["Existencia"].HeaderText = "Existencia";
-            dgvReporte.Columns["StockMinimo"].HeaderText = "Stock Mín.";
-            dgvReporte.Columns["Estado"].HeaderText = "Activo";
+            dgvReporte.Encabezado("Nombre", "Producto");
+            dgvReporte.Encabezado("NombreCategoria", "Categoría");
+            dgvReporte.Encabezado("PrecioCompra", "P. Compra");
+            dgvReporte.Encabezado("PrecioVenta", "P. Venta");
+            dgvReporte.Encabezado("Existencia", "Existencia");
+            dgvReporte.Encabezado("StockMinimo", "Stock Mín.");
+            dgvReporte.Encabezado("Estado", "Activo");
         }
     }
 
@@ -161,20 +161,20 @@ public partial class FormReportes : Form
         OcultarColumna("IdCategoria");
         if (dgvReporte.Columns["Nombre"] != null)
         {
-            dgvReporte.Columns["Nombre"].HeaderText = "Producto";
-            dgvReporte.Columns["NombreCategoria"].HeaderText = "Categoría";
-            dgvReporte.Columns["PrecioVenta"].HeaderText = "P. Venta";
-            dgvReporte.Columns["Existencia"].HeaderText = "Existencia";
-            dgvReporte.Columns["StockMinimo"].HeaderText = "Stock Mín.";
-            dgvReporte.Columns["PrecioCompra"].Visible = false;
-            dgvReporte.Columns["Estado"].Visible = false;
+            dgvReporte.Encabezado("Nombre", "Producto");
+            dgvReporte.Encabezado("NombreCategoria", "Categoría");
+            dgvReporte.Encabezado("PrecioVenta", "P. Venta");
+            dgvReporte.Encabezado("Existencia", "Existencia");
+            dgvReporte.Encabezado("StockMinimo", "Stock Mín.");
+            dgvReporte.OcultarColumna("PrecioCompra");
+            dgvReporte.OcultarColumna("Estado");
         }
     }
 
     private void GenerarCaja()
     {
         // Mostrar el historial de todas las cajas en el grid
-        var cajas = new Repositories.CajaRepository().ObtenerHistorial();
+        var cajas = new CajaService().ObtenerHistorial();
 
         dgvReporte.DataSource = null;
         dgvReporte.DataSource = cajas;
@@ -182,14 +182,14 @@ public partial class FormReportes : Form
         OcultarColumna("Movimientos");
         if (dgvReporte.Columns.Count > 0 && dgvReporte.Columns["IdCaja"] != null)
         {
-            dgvReporte.Columns["IdCaja"].HeaderText = "# Caja";
-            dgvReporte.Columns["FechaApertura"].HeaderText = "Apertura";
-            dgvReporte.Columns["MontoInicial"].HeaderText = "Monto Inicial";
-            dgvReporte.Columns["FechaCierre"].HeaderText = "Cierre";
-            dgvReporte.Columns["MontoFinal"].HeaderText = "Monto Contado";
-            dgvReporte.Columns["MontoEsperado"].HeaderText = "Monto Esperado";
-            dgvReporte.Columns["Diferencia"].HeaderText = "Diferencia";
-            dgvReporte.Columns["Estado"].HeaderText = "Estado";
+            dgvReporte.Encabezado("IdCaja", "# Caja");
+            dgvReporte.Encabezado("FechaApertura", "Apertura");
+            dgvReporte.Encabezado("MontoInicial", "Monto Inicial");
+            dgvReporte.Encabezado("FechaCierre", "Cierre");
+            dgvReporte.Encabezado("MontoFinal", "Monto Contado");
+            dgvReporte.Encabezado("MontoEsperado", "Monto Esperado");
+            dgvReporte.Encabezado("Diferencia", "Diferencia");
+            dgvReporte.Encabezado("Estado", "Estado");
         }
 
         // Mostrar resumen de caja abierta si existe
@@ -260,19 +260,13 @@ public partial class FormReportes : Form
     {
         for (int i = 0; i < pares.Length - 1; i += 2)
         {
-            if (dgvReporte.Columns[pares[i]] != null)
-            {
-                dgvReporte.Columns[pares[i]].HeaderText = pares[i + 1];
-            }
+            dgvReporte.Encabezado(pares[i], pares[i + 1]);
         }
     }
 
     private void OcultarColumna(string nombre)
     {
-        if (dgvReporte.Columns[nombre] != null)
-        {
-            dgvReporte.Columns[nombre].Visible = false;
-        }
+        dgvReporte.OcultarColumna(nombre);
     }
 
     private void MostrarMensaje(string mensaje, bool esError = true)

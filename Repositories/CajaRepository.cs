@@ -1,4 +1,5 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using Microsoft.Data.Sqlite;
 
@@ -30,8 +31,8 @@ public class CajaRepository
             VALUES ($fechaApertura, $montoInicial, 'Abierta');
             SELECT last_insert_rowid();
             """;
-        command.Parameters.AddWithValue("$fechaApertura", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-        command.Parameters.AddWithValue("$montoInicial", montoInicial);
+        command.Parameters.AddWithValue("$fechaApertura", Fechas.ParaBaseDatos(DateTime.Now));
+        command.Parameters.AddWithValue("$montoInicial", Dinero.ACentavos(montoInicial));
 
         var id = Convert.ToInt32(command.ExecuteScalar());
         transaction.Commit();
@@ -49,11 +50,11 @@ public class CajaRepository
         using var transaction = connection.BeginTransaction();
 
         var totales = ObtenerTotales(connection, transaction, idCaja)
-            ?? throw new InvalidOperationException("No se encontró la caja indicada.");
+            ?? throw new ReglaNegocioException("No se encontró la caja indicada.");
 
         if (totales.Estado != "Abierta")
         {
-            throw new InvalidOperationException("La caja ya se encuentra cerrada.");
+            throw new ReglaNegocioException("La caja ya se encuentra cerrada.");
         }
 
         var esperado = totales.SaldoEsperado;
@@ -69,15 +70,15 @@ public class CajaRepository
                 Estado        = 'Cerrada'
             WHERE IdCaja = $id AND Estado = 'Abierta';
             """;
-        command.Parameters.AddWithValue("$fechaCierre", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-        command.Parameters.AddWithValue("$montoFinal", montoFinal);
-        command.Parameters.AddWithValue("$montoEsperado", esperado);
-        command.Parameters.AddWithValue("$diferencia", montoFinal - esperado);
+        command.Parameters.AddWithValue("$fechaCierre", Fechas.ParaBaseDatos(DateTime.Now));
+        command.Parameters.AddWithValue("$montoFinal", Dinero.ACentavos(montoFinal));
+        command.Parameters.AddWithValue("$montoEsperado", Dinero.ACentavos(esperado));
+        command.Parameters.AddWithValue("$diferencia", Dinero.ACentavos(montoFinal - esperado));
         command.Parameters.AddWithValue("$id", idCaja);
 
         if (command.ExecuteNonQuery() != 1)
         {
-            throw new InvalidOperationException("No se pudo cerrar la caja: su estado cambió.");
+            throw new ReglaNegocioException("No se pudo cerrar la caja: su estado cambió.");
         }
 
         transaction.Commit();
@@ -118,16 +119,16 @@ public class CajaRepository
         using var transaction = connection.BeginTransaction();
 
         var totales = ObtenerTotales(connection, transaction, movimiento.IdCaja)
-            ?? throw new InvalidOperationException("No se encontró la caja indicada.");
+            ?? throw new ReglaNegocioException("No se encontró la caja indicada.");
 
         if (totales.Estado != "Abierta")
         {
-            throw new InvalidOperationException("La caja está cerrada; no admite movimientos.");
+            throw new ReglaNegocioException("La caja está cerrada; no admite movimientos.");
         }
 
         if (movimiento.Tipo == "Salida" && movimiento.Monto > totales.SaldoEsperado)
         {
-            throw new InvalidOperationException(
+            throw new ReglaNegocioException(
                 $"La salida ({movimiento.Monto:C2}) supera el efectivo disponible en caja ({totales.SaldoEsperado:C2}).");
         }
 
@@ -139,9 +140,9 @@ public class CajaRepository
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$idCaja", movimiento.IdCaja);
-        command.Parameters.AddWithValue("$fechaHora", movimiento.FechaHora.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(movimiento.FechaHora));
         command.Parameters.AddWithValue("$tipo", movimiento.Tipo);
-        command.Parameters.AddWithValue("$monto", movimiento.Monto);
+        command.Parameters.AddWithValue("$monto", Dinero.ACentavos(movimiento.Monto));
         command.Parameters.AddWithValue("$descripcion", (object?)movimiento.Descripcion ?? DBNull.Value);
 
         var id = Convert.ToInt32(command.ExecuteScalar());
@@ -170,9 +171,9 @@ public class CajaRepository
             {
                 IdMovimiento = reader.GetInt32(0),
                 IdCaja       = reader.GetInt32(1),
-                FechaHora    = DateTime.Parse(reader.GetString(2)),
+                FechaHora    = Fechas.DesdeBaseDatos(reader.GetString(2)),
                 Tipo         = reader.GetString(3),
-                Monto        = reader.GetDecimal(4),
+                Monto        = reader.LeerDinero(4),
                 Descripcion  = reader.IsDBNull(5) ? null : reader.GetString(5)
             });
         }
@@ -219,29 +220,26 @@ public class CajaRepository
         }
 
         return new TotalesCaja(
-            MontoInicial:       reader.GetDecimal(0),
+            MontoInicial:       reader.LeerDinero(0),
             Estado:             reader.GetString(1),
-            VentasEfectivo:     Redondear(reader.GetDecimal(2)),
-            VentasOtrosMetodos: Redondear(reader.GetDecimal(3)),
-            Entradas:           Redondear(reader.GetDecimal(4)),
-            Salidas:            Redondear(reader.GetDecimal(5)));
+            VentasEfectivo:     reader.LeerDinero(2),
+            VentasOtrosMetodos: reader.LeerDinero(3),
+            Entradas:           reader.LeerDinero(4),
+            Salidas:            reader.LeerDinero(5));
     }
-
-    // Las sumas de columnas REAL pueden traer residuos (p. ej. 15.150000000000002).
-    private static decimal Redondear(decimal valor) => Math.Round(valor, 2, MidpointRounding.AwayFromZero);
 
     private static Caja Mapear(SqliteDataReader reader)
     {
         return new Caja
         {
             IdCaja        = reader.GetInt32(0),
-            FechaApertura = DateTime.Parse(reader.GetString(1)),
-            MontoInicial  = reader.GetDecimal(2),
-            FechaCierre   = reader.IsDBNull(3) ? null : DateTime.Parse(reader.GetString(3)),
-            MontoFinal    = reader.IsDBNull(4) ? null : reader.GetDecimal(4),
+            FechaApertura = Fechas.DesdeBaseDatos(reader.GetString(1)),
+            MontoInicial  = reader.LeerDinero(2),
+            FechaCierre   = reader.IsDBNull(3) ? null : Fechas.DesdeBaseDatos(reader.GetString(3)),
+            MontoFinal    = reader.LeerDineroONulo(4),
             Estado        = reader.GetString(5),
-            MontoEsperado = reader.IsDBNull(6) ? null : reader.GetDecimal(6),
-            Diferencia    = reader.IsDBNull(7) ? null : reader.GetDecimal(7)
+            MontoEsperado = reader.LeerDineroONulo(6),
+            Diferencia    = reader.LeerDineroONulo(7)
         };
     }
 

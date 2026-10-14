@@ -6,10 +6,51 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Escala las pantallas según el zoom de Windows (100 %, 125 %, 150 %…). -->
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <!-- Datos del programa (Propiedades > Detalles del .exe). Suba la versión en cada entrega. -->
+  <PropertyGroup>
+    <AssemblyName>LacteosMadeline</AssemblyName>
+    <Product>Lácteos Madeline</Product>
+    <AssemblyTitle>Lácteos Madeline – Sistema de ventas e inventario</AssemblyTitle>
+    <Company>Lácteos Madeline</Company>
+    <Version>1.1.0</Version>
+  </PropertyGroup>
+
+  <!--
+    Publicación para instalar en cualquier PC con Windows 10/11 de 64 bits,
+    sin instalar .NET: un único LacteosMadeline.exe autocontenido.
+    La usan scripts\publicar.ps1 e Instalar.cmd (dotnet publish -c Release).
+  -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>es</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+  </ItemGroup>
+
+  <!-- El proyecto de pruebas vive en Tests/ y se compila por separado. -->
+  <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Tests\**" />
+    <InternalsVisibleTo Include="LacteosMadeline.Tests" />
+  </ItemGroup>
+
+  <!-- Carpetas de herramientas y salida que no forman parte del programa. -->
+  <ItemGroup>
+    <Compile Remove="dist\**;scripts\**" />
+    <None Remove="dist\**;scripts\**" />
   </ItemGroup>
 
 </Project>

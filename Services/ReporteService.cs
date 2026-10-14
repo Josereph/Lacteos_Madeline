@@ -2,7 +2,6 @@ using LacteosMadeline.Data;
 using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Repositories;
-using Microsoft.Data.Sqlite;
 
 namespace LacteosMadeline.Services;
 
@@ -23,7 +22,7 @@ public class ReporteService
 
     public List<FilaReporteVenta> ReporteVentas(DateTime? desde = null, DateTime? hasta = null)
     {
-        var ventas = ObtenerVentasConFiltro(desde, hasta);
+        var ventas = _ventaRepository.ObtenerPorRango(desde, hasta, cronologico: true);
         decimal acumulado = 0;
 
         return ventas.Select(v =>
@@ -38,26 +37,6 @@ public class ReporteService
                 Acumulado  = acumulado
             };
         }).ToList();
-    }
-
-    private List<Venta> ObtenerVentasConFiltro(DateTime? desde, DateTime? hasta)
-    {
-        using var connection = DatabaseConnection.CreateConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = $"""
-            SELECT {VentaRepository.ColumnasVenta} FROM Ventas
-            WHERE FechaHora BETWEEN $desde AND $hasta
-            ORDER BY FechaHora, IdVenta;
-            """;
-        RangoFechas.AgregarParametros(command, desde, hasta);
-
-        var ventas = new List<Venta>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            ventas.Add(VentaRepository.MapearVenta(reader));
-        }
-        return ventas;
     }
 
     // ─── Productos de mayor rotación ──────────────────────────────────────
@@ -83,7 +62,7 @@ public class ReporteService
                 SELECT d.IdProducto,
                        MAX(d.NombreProducto)     AS NombreHistorico,
                        SUM(d.Cantidad)           AS Unidades,
-                       ROUND(SUM(d.Subtotal), 2) AS Importe,
+                       SUM(d.Subtotal)           AS Importe,
                        COUNT(DISTINCT d.IdVenta) AS NumVentas
                 FROM VentasRango v
                 INNER JOIN DetalleVentas d ON d.IdVenta = v.IdVenta
@@ -107,7 +86,7 @@ public class ReporteService
                 Posicion          = posicion++,
                 Producto          = reader.GetString(0),
                 UnidadesVendidas  = reader.GetInt32(1),
-                TotalVendido      = reader.GetDecimal(2),
+                TotalVendido      = reader.LeerDinero(2),
                 NumeroVentas      = reader.GetInt32(3),
                 ExistenciaActual  = reader.IsDBNull(4) ? 0 : reader.GetInt32(4)
             });

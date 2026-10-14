@@ -1,4 +1,5 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using Microsoft.Data.Sqlite;
 
@@ -48,11 +49,11 @@ public class VentaRepository
             VALUES ($fechaHora, $total, $metodoPago, $montoRecibido, $cambio, $idCaja);
             SELECT last_insert_rowid();
             """;
-        command.Parameters.AddWithValue("$fechaHora", venta.FechaHora.ToString("yyyy-MM-dd HH:mm:ss"));
-        command.Parameters.AddWithValue("$total", venta.Total);
+        command.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(venta.FechaHora));
+        command.Parameters.AddWithValue("$total", Dinero.ACentavos(venta.Total));
         command.Parameters.AddWithValue("$metodoPago", venta.MetodoPago);
-        command.Parameters.AddWithValue("$montoRecibido", (object?)venta.MontoRecibido ?? DBNull.Value);
-        command.Parameters.AddWithValue("$cambio", (object?)venta.Cambio ?? DBNull.Value);
+        command.Parameters.AddWithValue("$montoRecibido", Dinero.ACentavos(venta.MontoRecibido));
+        command.Parameters.AddWithValue("$cambio", Dinero.ACentavos(venta.Cambio));
         command.Parameters.AddWithValue("$idCaja", (object?)venta.IdCaja ?? DBNull.Value);
 
         return Convert.ToInt32(command.ExecuteScalar());
@@ -70,8 +71,8 @@ public class VentaRepository
         command.Parameters.AddWithValue("$idProducto", detalle.IdProducto);
         command.Parameters.AddWithValue("$nombreProducto", detalle.NombreProducto);
         command.Parameters.AddWithValue("$cantidad", detalle.Cantidad);
-        command.Parameters.AddWithValue("$precioUnitario", detalle.PrecioUnitario);
-        command.Parameters.AddWithValue("$subtotal", detalle.Subtotal);
+        command.Parameters.AddWithValue("$precioUnitario", Dinero.ACentavos(detalle.PrecioUnitario));
+        command.Parameters.AddWithValue("$subtotal", Dinero.ACentavos(detalle.Subtotal));
         command.ExecuteNonQuery();
     }
 
@@ -117,7 +118,7 @@ public class VentaRepository
                     IdProducto = reader.GetInt32(2),
                     NombreProducto = reader.GetString(3),
                     Cantidad = reader.GetInt32(4),
-                    PrecioUnitario = reader.GetDecimal(5)
+                    PrecioUnitario = reader.LeerDinero(5)
                 });
             }
         }
@@ -126,19 +127,21 @@ public class VentaRepository
     }
 
     /// <summary>
-    /// Ventas del rango de fechas (días completos), más recientes primero.
+    /// Ventas del rango de fechas (días completos), más recientes primero,
+    /// o en orden cronológico si <paramref name="cronologico"/> es true.
     /// Usa el índice IX_Ventas_FechaHora: no recorre todo el historial.
     /// </summary>
-    public List<Venta> ObtenerPorRango(DateTime? desde, DateTime? hasta)
+    public List<Venta> ObtenerPorRango(DateTime? desde, DateTime? hasta, bool cronologico = false)
     {
         var ventas = new List<Venta>();
+        var orden = cronologico ? "FechaHora, IdVenta" : "FechaHora DESC, IdVenta DESC";
 
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
         command.CommandText = $"""
             SELECT {ColumnasVenta} FROM Ventas
             WHERE FechaHora BETWEEN $desde AND $hasta
-            ORDER BY FechaHora DESC, IdVenta DESC;
+            ORDER BY {orden};
             """;
         RangoFechas.AgregarParametros(command, desde, hasta);
 
@@ -178,11 +181,11 @@ public class VentaRepository
         return new Venta
         {
             IdVenta = reader.GetInt32(0),
-            FechaHora = DateTime.Parse(reader.GetString(1)),
-            Total = reader.GetDecimal(2),
+            FechaHora = Fechas.DesdeBaseDatos(reader.GetString(1)),
+            Total = reader.LeerDinero(2),
             MetodoPago = reader.GetString(3),
-            MontoRecibido = reader.IsDBNull(4) ? null : reader.GetDecimal(4),
-            Cambio = reader.IsDBNull(5) ? null : reader.GetDecimal(5),
+            MontoRecibido = reader.LeerDineroONulo(4),
+            Cambio = reader.LeerDineroONulo(5),
             IdCaja = reader.IsDBNull(6) ? null : reader.GetInt32(6)
         };
     }

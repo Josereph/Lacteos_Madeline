@@ -1,6 +1,8 @@
 using LacteosMadeline.Models;
 using LacteosMadeline.Services;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -205,17 +207,17 @@ public partial class FormMermas : Form
 
         if (dgvMermas.Columns["IdMerma"] is not null)
         {
-            dgvMermas.Columns["IdMerma"]!.Visible = false;
-            dgvMermas.Columns["IdProducto"]!.Visible = false;
-            dgvMermas.Columns["FechaHora"]!.HeaderText = "Fecha";
-            dgvMermas.Columns["NombreProducto"]!.HeaderText = "Producto";
-            dgvMermas.Columns["Cantidad"]!.HeaderText = "Cant.";
-            dgvMermas.Columns["Motivo"]!.HeaderText = "Motivo";
-            dgvMermas.Columns["CostoUnitario"]!.Visible = false; // la pérdida ya lo refleja
-            dgvMermas.Columns["CostoTotal"]!.HeaderText = "Pérdida";
-            dgvMermas.Columns["Observacion"]!.HeaderText = "Observación";
+            dgvMermas.OcultarColumna("IdMerma");
+            dgvMermas.OcultarColumna("IdProducto");
+            dgvMermas.Encabezado("FechaHora", "Fecha");
+            dgvMermas.Encabezado("NombreProducto", "Producto");
+            dgvMermas.Encabezado("Cantidad", "Cant.");
+            dgvMermas.Encabezado("Motivo", "Motivo");
+            dgvMermas.OcultarColumna("CostoUnitario"); // la pérdida ya lo refleja
+            dgvMermas.Encabezado("CostoTotal", "Pérdida");
+            dgvMermas.Encabezado("Observacion", "Observación");
 
-            dgvMermas.Columns["FechaHora"]!.DefaultCellStyle.Format = "dd/MM/yy HH:mm";
+            dgvMermas.FormatoColumna("FechaHora", "dd/MM/yy HH:mm");
             dgvMermas.Columns["Cantidad"]!.FillWeight = 55;
             dgvMermas.Columns["Motivo"]!.FillWeight = 115;
         }

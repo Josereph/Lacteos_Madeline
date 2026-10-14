@@ -1,5 +1,5 @@
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
 using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
@@ -14,8 +14,6 @@ namespace LacteosMadeline.Forms;
 public partial class FormCompras : Form
 {
     private readonly CompraService _compraService = new();
-    private readonly ProveedorRepository _proveedorRepository = new();
-    private readonly ProductoRepository _productoRepository = new();
 
     public FormCompras()
     {
@@ -35,7 +33,7 @@ public partial class FormCompras : Form
 
     private void CargarProveedores()
     {
-        var proveedores = _proveedorRepository.Buscar(soloActivos: true);
+        var proveedores = _compraService.ProveedoresActivos();
         cboProveedor.DisplayMember = "Nombre";
         cboProveedor.ValueMember = "IdProveedor";
         cboProveedor.DataSource = proveedores;
@@ -43,7 +41,7 @@ public partial class FormCompras : Form
 
     private void CargarProductos()
     {
-        var productos = _productoRepository.Buscar(soloActivos: true);
+        var productos = _compraService.ProductosActivos();
         cboProducto.DisplayMember = "Nombre";
         cboProducto.ValueMember = "IdProducto";
         cboProducto.DataSource = productos;
@@ -57,7 +55,7 @@ public partial class FormCompras : Form
             return;
         }
 
-        if (!decimal.TryParse(txtCosto.Text, out var costo))
+        if (!Dinero.TryParse(txtCosto.Text, out var costo))
         {
             MostrarMensaje("Ingrese un costo unitario válido.");
             return;
@@ -120,13 +118,13 @@ public partial class FormCompras : Form
 
         if (dgvDetalle.Columns.Count > 0 && dgvDetalle.Columns["IdDetalleCompra"] != null)
         {
-            dgvDetalle.Columns["IdDetalleCompra"].Visible = false;
-            dgvDetalle.Columns["IdCompra"].Visible = false;
-            dgvDetalle.Columns["IdProducto"].Visible = false;
-            dgvDetalle.Columns["NombreProducto"].HeaderText = "Producto";
-            dgvDetalle.Columns["Cantidad"].HeaderText = "Cantidad";
-            dgvDetalle.Columns["CostoUnitario"].HeaderText = "Costo Unit.";
-            dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal";
+            dgvDetalle.OcultarColumna("IdDetalleCompra");
+            dgvDetalle.OcultarColumna("IdCompra");
+            dgvDetalle.OcultarColumna("IdProducto");
+            dgvDetalle.Encabezado("NombreProducto", "Producto");
+            dgvDetalle.Encabezado("Cantidad", "Cantidad");
+            dgvDetalle.Encabezado("CostoUnitario", "Costo Unit.");
+            dgvDetalle.Encabezado("Subtotal", "Subtotal");
         }
 
         lblTotal.Text = $"Total: {_compraService.Total:C2}";

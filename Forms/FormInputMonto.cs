@@ -1,3 +1,5 @@
+using LacteosMadeline.Helpers;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -44,7 +46,7 @@ public class FormInputMonto : Form
         {
             Location = new Point(12, 52),
             Size = new Size(315, 23),
-            Text = valorInicial.ToString("F2")
+            Text = Dinero.ParaEditar(valorInicial)
         };
 
         _lblCambio = new Label
@@ -95,7 +97,7 @@ public class FormInputMonto : Form
     {
         if (_totalAPagar is not decimal total) return;
 
-        if (!decimal.TryParse(_txtMonto.Text.Trim(), out var recibido))
+        if (!Dinero.TryParse(_txtMonto.Text, out var recibido))
         {
             _lblCambio.ForeColor = Tema.Alerta;
             _lblCambio.Text = "Monto no válido";
@@ -114,7 +116,7 @@ public class FormInputMonto : Form
 
     private void BtnAceptar_Click(object? sender, EventArgs e)
     {
-        if (!decimal.TryParse(_txtMonto.Text.Trim(), out var valor) || valor < 0)
+        if (!Dinero.TryParse(_txtMonto.Text, out var valor) || valor < 0)
         {
             MessageBox.Show("Ingrese un monto válido (número mayor o igual a cero).",
                 "Valor inválido", MessageBoxButtons.OK, MessageBoxIcon.Warning);

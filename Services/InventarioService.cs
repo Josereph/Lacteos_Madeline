@@ -12,6 +12,9 @@ namespace LacteosMadeline.Services;
 /// </summary>
 public class InventarioService
 {
+    public const string MotivoConteoFisico = "Conteo físico";
+    public const string MotivoCorreccionProducto = "Corrección desde Productos";
+
     private readonly ProductoRepository _productoRepository = new();
 
     public List<Producto> ConsultarDisponibles()
@@ -39,26 +42,40 @@ public class InventarioService
     }
 
     /// <summary>
-    /// Ajuste por conteo físico. Para pérdidas por caducidad o daño use
-    /// MermaService, que deja registro del motivo y del costo.
+    /// Ajuste manual de existencia. Queda registrado en AjustesInventario
+    /// (valor anterior, nuevo y motivo) en la misma transacción que el cambio.
+    /// Con <paramref name="existenciaEsperada"/> (la que el usuario veía en
+    /// pantalla) el ajuste se rechaza si entretanto hubo una venta o compra.
+    /// Para pérdidas por caducidad o daño use MermaService, que además
+    /// valora la pérdida.
     /// </summary>
-    public (bool Exitoso, string Mensaje) AjustarExistencia(int idProducto, int nuevaExistencia)
+    public (bool Exitoso, string Mensaje) AjustarExistencia(
+        int idProducto, int nuevaExistencia, string motivo = MotivoConteoFisico, int? existenciaEsperada = null)
     {
         if (nuevaExistencia < 0)
         {
             return (false, "La existencia no puede ser negativa.");
         }
 
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            return (false, "Indique el motivo del ajuste.");
+        }
+
         try
         {
-            var anterior = ConsultarExistencia(idProducto);
-            _productoRepository.AjustarExistencia(idProducto, nuevaExistencia);
-            LogHelper.Info("Ajuste de inventario", $"Producto #{idProducto}: {anterior} → {nuevaExistencia}");
-            return (true, "Existencia ajustada correctamente.");
+            var anterior = _productoRepository.AjustarExistencia(idProducto, nuevaExistencia, motivo.Trim(), existenciaEsperada);
+            return (true, anterior == nuevaExistencia
+                ? "La existencia no cambió."
+                : $"Existencia ajustada de {anterior} a {nuevaExistencia}.");
+        }
+        catch (ReglaNegocioException ex)
+        {
+            return (false, ex.Message);
         }
         catch (Exception ex)
         {
-            if (ex is not InvalidOperationException) LogHelper.Error($"Ajuste de existencia producto #{idProducto}", ex);
+            LogHelper.Error($"Ajuste de existencia producto #{idProducto}", ex);
             return (false, ErroresBaseDatos.MensajeAmigable(ex));
         }
     }

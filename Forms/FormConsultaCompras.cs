@@ -1,5 +1,5 @@
 using LacteosMadeline.Models;
-using LacteosMadeline.Repositories;
+using LacteosMadeline.Services;
 
 using LacteosMadeline.Forms.Shell;
 
@@ -11,8 +11,8 @@ namespace LacteosMadeline.Forms;
 /// </summary>
 public partial class FormConsultaCompras : Form
 {
-    private readonly CompraRepository _compraRepository = new();
-    private readonly ProveedorRepository _proveedorRepository = new();
+    private readonly CompraService _compraService = new();
+    private readonly ProveedorService _proveedorService = new();
 
     public FormConsultaCompras()
     {
@@ -32,7 +32,7 @@ public partial class FormConsultaCompras : Form
 
     private void CargarProveedores()
     {
-        var todos = _proveedorRepository.Buscar();
+        var todos = _proveedorService.Buscar();
 
         // Usar clase concreta para que DisplayMember/ValueMember funcionen
         var lista = new List<ItemCombo> { new ItemCombo(0, "(Todos)") };
@@ -53,7 +53,7 @@ public partial class FormConsultaCompras : Form
         var desde = dtpDesde.Value.Date;
         var hasta = dtpHasta.Value.Date;
 
-        var compras = _compraRepository.ObtenerHistorial(desde, hasta);
+        var compras = _compraService.ConsultarHistorial(desde, hasta);
 
         // Filtro adicional por proveedor
         if (cboProveedor.SelectedValue is int idProveedor && idProveedor > 0)
@@ -66,11 +66,11 @@ public partial class FormConsultaCompras : Form
 
         if (dgvCompras.Columns.Count > 0 && dgvCompras.Columns["IdCompra"] != null)
         {
-            dgvCompras.Columns["IdCompra"].HeaderText = "# Compra";
-            dgvCompras.Columns["FechaHora"].HeaderText = "Fecha / Hora";
-            dgvCompras.Columns["IdProveedor"].Visible = false;
-            dgvCompras.Columns["NombreProveedor"].HeaderText = "Proveedor";
-            dgvCompras.Columns["Total"].HeaderText = "Total";
+            dgvCompras.Encabezado("IdCompra", "# Compra");
+            dgvCompras.Encabezado("FechaHora", "Fecha / Hora");
+            dgvCompras.OcultarColumna("IdProveedor");
+            dgvCompras.Encabezado("NombreProveedor", "Proveedor");
+            dgvCompras.Encabezado("Total", "Total");
             if (dgvCompras.Columns["Detalles"] is { } colDetalles) colDetalles.Visible = false;
         }
 
@@ -82,7 +82,7 @@ public partial class FormConsultaCompras : Form
     {
         if (dgvCompras.CurrentRow?.DataBoundItem is not Compra compra) return;
 
-        var compraCompleta = _compraRepository.ObtenerPorId(compra.IdCompra);
+        var compraCompleta = _compraService.ObtenerPorId(compra.IdCompra);
         if (compraCompleta is null) return;
 
         dgvDetalle.DataSource = null;
@@ -90,13 +90,13 @@ public partial class FormConsultaCompras : Form
 
         if (dgvDetalle.Columns.Count > 0 && dgvDetalle.Columns["IdDetalleCompra"] != null)
         {
-            dgvDetalle.Columns["IdDetalleCompra"].Visible = false;
-            dgvDetalle.Columns["IdCompra"].Visible = false;
-            dgvDetalle.Columns["IdProducto"].Visible = false;
-            dgvDetalle.Columns["NombreProducto"].HeaderText = "Producto";
-            dgvDetalle.Columns["Cantidad"].HeaderText = "Cantidad";
-            dgvDetalle.Columns["CostoUnitario"].HeaderText = "Costo Unit.";
-            dgvDetalle.Columns["Subtotal"].HeaderText = "Subtotal";
+            dgvDetalle.OcultarColumna("IdDetalleCompra");
+            dgvDetalle.OcultarColumna("IdCompra");
+            dgvDetalle.OcultarColumna("IdProducto");
+            dgvDetalle.Encabezado("NombreProducto", "Producto");
+            dgvDetalle.Encabezado("Cantidad", "Cantidad");
+            dgvDetalle.Encabezado("CostoUnitario", "Costo Unit.");
+            dgvDetalle.Encabezado("Subtotal", "Subtotal");
         }
     }
 

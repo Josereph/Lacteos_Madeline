@@ -2,6 +2,8 @@ using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Services;
 
+using LacteosMadeline.Forms.Shell;
+
 namespace LacteosMadeline.Forms;
 
 /// <summary>
@@ -235,15 +237,15 @@ public partial class FormVentas : Form
 
         if (dgvCarrito.Columns["IdProducto"] != null)
         {
-            dgvCarrito.Columns["IdProducto"].Visible = false;
-            dgvCarrito.Columns["IdDetalleVenta"].Visible = false;
-            dgvCarrito.Columns["IdVenta"].Visible = false;
-            dgvCarrito.Columns["NombreProducto"].HeaderText = "Producto";
-            dgvCarrito.Columns["Cantidad"].HeaderText = "Cantidad";
-            dgvCarrito.Columns["PrecioUnitario"].HeaderText = "Precio Unitario";
-            dgvCarrito.Columns["PrecioUnitario"].DefaultCellStyle.Format = "C2";
-            dgvCarrito.Columns["Subtotal"].HeaderText = "Subtotal";
-            dgvCarrito.Columns["Subtotal"].DefaultCellStyle.Format = "C2";
+            dgvCarrito.OcultarColumna("IdProducto");
+            dgvCarrito.OcultarColumna("IdDetalleVenta");
+            dgvCarrito.OcultarColumna("IdVenta");
+            dgvCarrito.Encabezado("NombreProducto", "Producto");
+            dgvCarrito.Encabezado("Cantidad", "Cantidad");
+            dgvCarrito.Encabezado("PrecioUnitario", "Precio Unitario");
+            dgvCarrito.FormatoColumna("PrecioUnitario", "C2");
+            dgvCarrito.Encabezado("Subtotal", "Subtotal");
+            dgvCarrito.FormatoColumna("Subtotal", "C2");
         }
 
         lblTotal.Text = $"{_ventaService.Total:C2}";

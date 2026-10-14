@@ -17,7 +17,7 @@ public partial class Form1 : Form
 {
     public enum Modulo { PuntoDeVenta, Productos, Compras, Caja, Mermas, Reportes, Proveedores }
 
-    private static readonly CultureInfo Cultura = CultureInfo.GetCultureInfo("es-ES");
+    private static readonly CultureInfo Cultura = ConfiguracionNegocio.Cultura;
 
     private readonly Dictionary<Modulo, BotonNavegacion> _botones;
     private readonly CajaService _cajaService = new();

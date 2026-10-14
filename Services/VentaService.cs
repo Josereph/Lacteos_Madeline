@@ -106,7 +106,7 @@ public class VentaService
             }
         }
 
-        var total = Math.Round(Total, 2, MidpointRounding.AwayFromZero);
+        var total = Dinero.Redondear(Total);
         decimal? cambio = null;
 
         if (metodoPago == Venta.PagoEfectivo)
@@ -147,7 +147,7 @@ public class VentaService
             _carrito.Clear();
             return (true, "Venta registrada correctamente.", venta);
         }
-        catch (InvalidOperationException ex)
+        catch (ReglaNegocioException ex)
         {
             // Existencia insuficiente detectada dentro de la transacción (RN-05).
             return (false, $"{ex.Message} Verifique las existencias; la venta no se registró.", null);
@@ -166,11 +166,25 @@ public class VentaService
 
     public static decimal CalcularCambio(decimal total, decimal montoRecibido)
     {
-        return Math.Round(montoRecibido - total, 2, MidpointRounding.AwayFromZero);
+        return Dinero.Redondear(montoRecibido - total);
     }
 
     public bool HayCajaAbierta()
     {
         return _cajaRepository.ObtenerCajaAbierta() is not null;
+    }
+
+    // ── Consultas de ventas registradas ─────────────────────────────────
+
+    /// <summary>Venta con su detalle, o null si no existe.</summary>
+    public Venta? ObtenerPorId(int idVenta)
+    {
+        return _ventaRepository.ObtenerPorId(idVenta);
+    }
+
+    /// <summary>Ventas del rango de fechas, más recientes primero.</summary>
+    public List<Venta> ConsultarPorRango(DateTime? desde, DateTime? hasta)
+    {
+        return _ventaRepository.ObtenerPorRango(desde, hasta);
     }
 }

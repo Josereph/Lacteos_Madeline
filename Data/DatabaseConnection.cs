@@ -11,7 +11,7 @@ public static class DatabaseConnection
 {
     // La variable de entorno LACTEOS_DB_PATH permite apuntar a otra base de
     // datos (por ejemplo, para pruebas) sin tocar la base de datos del negocio.
-    public static readonly string DatabasePath =
+    public static string DatabasePath { get; private set; } =
         Environment.GetEnvironmentVariable("LACTEOS_DB_PATH") is { Length: > 0 } rutaPersonalizada
             ? Path.GetFullPath(rutaPersonalizada)
             : Path.Combine(
@@ -22,7 +22,17 @@ public static class DatabaseConnection
     /// <summary>
     /// Carpeta de datos de la aplicación: base de datos, logs y respaldos.
     /// </summary>
-    public static readonly string DatabaseFolder = Path.GetDirectoryName(DatabasePath)!;
+    public static string DatabaseFolder => Path.GetDirectoryName(DatabasePath)!;
+
+    /// <summary>
+    /// Cambia la base de datos activa. Solo para las pruebas automatizadas,
+    /// que trabajan cada una sobre un archivo temporal propio.
+    /// </summary>
+    internal static void ConfigurarRuta(string ruta)
+    {
+        SqliteConnection.ClearAllPools();
+        DatabasePath = Path.GetFullPath(ruta);
+    }
 
     // Pooling: reutiliza conexiones abiertas, evitando reabrir el archivo
     // en cada consulta (importante para la velocidad en mostrador).
