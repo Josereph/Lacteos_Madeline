@@ -30,13 +30,13 @@ public class InventarioService
         return _productoRepository.ObtenerBajoStock();
     }
 
-    public int ConsultarExistencia(int idProducto)
+    public decimal ConsultarExistencia(int idProducto)
     {
         var producto = _productoRepository.ObtenerPorId(idProducto);
         return producto?.Existencia ?? 0;
     }
 
-    public bool HayExistenciaSuficiente(int idProducto, int cantidad)
+    public bool HayExistenciaSuficiente(int idProducto, decimal cantidad)
     {
         return ConsultarExistencia(idProducto) >= cantidad;
     }
@@ -50,7 +50,7 @@ public class InventarioService
     /// valora la pérdida.
     /// </summary>
     public (bool Exitoso, string Mensaje) AjustarExistencia(
-        int idProducto, int nuevaExistencia, string motivo = MotivoConteoFisico, int? existenciaEsperada = null)
+        int idProducto, decimal nuevaExistencia, string motivo = MotivoConteoFisico, decimal? existenciaEsperada = null)
     {
         if (nuevaExistencia < 0)
         {
@@ -64,10 +64,26 @@ public class InventarioService
 
         try
         {
-            var anterior = _productoRepository.AjustarExistencia(idProducto, nuevaExistencia, motivo.Trim(), existenciaEsperada);
-            return (true, anterior == nuevaExistencia
+            var producto = _productoRepository.ObtenerPorId(idProducto);
+            if (producto is null)
+            {
+                return (false, "El producto no existe.");
+            }
+
+            if (nuevaExistencia > 0)
+            {
+                var valCantidad = Validaciones.ValidarCantidad(nuevaExistencia, producto.Unidad);
+                if (!valCantidad.EsValido)
+                {
+                    return (false, valCantidad.Mensaje);
+                }
+            }
+
+            var anterior = _productoRepository.AjustarExistencia(
+                idProducto, nuevaExistencia, motivo.Trim(), existenciaEsperada, Sesion.IdUsuario);
+            return (true, anterior == Cantidades.Redondear(nuevaExistencia)
                 ? "La existencia no cambió."
-                : $"Existencia ajustada de {anterior} a {nuevaExistencia}.");
+                : $"Existencia ajustada de {Cantidades.Formatear(anterior, producto.Unidad)} a {Cantidades.Formatear(nuevaExistencia, producto.Unidad)}.");
         }
         catch (ReglaNegocioException ex)
         {

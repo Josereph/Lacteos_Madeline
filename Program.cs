@@ -1,5 +1,8 @@
 using LacteosMadeline.Data;
+using LacteosMadeline.Forms;
 using LacteosMadeline.Helpers;
+using LacteosMadeline.Models;
+using LacteosMadeline.Services;
 
 namespace LacteosMadeline;
 
@@ -44,9 +47,58 @@ static class Program
             return;
         }
 
-        Application.Run(new Form1());
+        new ConfiguracionService().Cargar();
+
+        // Ciclo de sesión: "Cerrar sesión" vuelve a la pantalla de inicio
+        // para que entre otro usuario sin cerrar el programa.
+        while (IniciarSesion() is { } usuario)
+        {
+            Sesion.Iniciar(usuario);
+            using var principal = new Form1();
+            Application.Run(principal);
+            Sesion.Cerrar();
+
+            if (!principal.CerrarSesionSolicitada) break;
+        }
 
         MantenimientoAlSalir();
+    }
+
+    /// <summary>
+    /// Primer arranque (sin usuarios): crea el administrador. Si no, pide
+    /// usuario y PIN. Devuelve null si se cancela.
+    /// </summary>
+    private static Usuario? IniciarSesion()
+    {
+        if (new UsuarioService().RequiereConfiguracionInicial())
+        {
+            using var configuracion = new FormPrimerAdministrador();
+            return configuracion.ShowDialog() == DialogResult.OK ? configuracion.Administrador : null;
+        }
+
+        using var inicio = new FormInicioSesion();
+        return inicio.ShowDialog() == DialogResult.OK ? inicio.UsuarioAutenticado : null;
+    }
+
+    /// <summary>
+    /// Abre una instancia nueva del programa y cierra esta (por ejemplo,
+    /// después de restaurar un respaldo, para que todo se cargue de nuevo).
+    /// </summary>
+    public static void ReiniciarAplicacion()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } ejecutable)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ejecutable) { UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error("Reiniciar el programa", ex);
+        }
+
+        Environment.Exit(0);
     }
 
     /// <summary>

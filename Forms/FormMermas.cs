@@ -1,3 +1,4 @@
+using LacteosMadeline.Helpers;
 using LacteosMadeline.Models;
 using LacteosMadeline.Services;
 
@@ -67,7 +68,7 @@ public partial class FormMermas : Form
     {
         if (e.ListItem is Producto p)
         {
-            e.Value = $"{p.Nombre}  ·  stock {p.Existencia}";
+            e.Value = $"{p.Nombre}  ·  stock {Cantidades.Formatear(p.Existencia, p.Unidad)}";
         }
     }
 
@@ -87,11 +88,11 @@ public partial class FormMermas : Form
         }
         else
         {
-            lblExistencia.Text = $"Existencia actual: {producto.Existencia}  (mínimo {producto.StockMinimo})";
+            lblExistencia.Text = $"Existencia actual: {Cantidades.Formatear(producto.Existencia, producto.Unidad)}  " +
+                                 $"(mínimo {Cantidades.Formatear(producto.StockMinimo, producto.Unidad)})";
             // La cantidad no puede superar la existencia (el servicio lo vuelve a validar).
             nudCantidad.Enabled = true;
-            nudCantidad.Maximum = producto.Existencia;
-            if (nudCantidad.Value > nudCantidad.Maximum) nudCantidad.Value = nudCantidad.Maximum;
+            Construir.ConfigurarCantidad(nudCantidad, producto, producto.Existencia);
         }
 
         ActualizarCostoEstimado();
@@ -132,7 +133,7 @@ public partial class FormMermas : Form
         }
 
         var motivo = cboMotivo.SelectedItem as string ?? string.Empty;
-        var cantidad = (int)nudCantidad.Value;
+        var cantidad = nudCantidad.Value;
 
         if (motivo == Merma.MotivoOtro && string.IsNullOrWhiteSpace(txtObservacion.Text))
         {
@@ -143,7 +144,7 @@ public partial class FormMermas : Form
 
         // La baja descuenta inventario y no se puede deshacer desde el sistema.
         var confirmar = MessageBox.Show(
-            $"¿Dar de baja {cantidad} × {producto.Nombre}?\n\nMotivo: {motivo}\n" +
+            $"¿Dar de baja {Cantidades.Formatear(cantidad, producto.Unidad)} × {producto.Nombre}?\n\nMotivo: {motivo}\n" +
             "Esta acción descuenta el inventario.",
             "Confirmar baja de inventario",
             MessageBoxButtons.YesNo,
@@ -173,7 +174,7 @@ public partial class FormMermas : Form
 
     private void LimpiarCaptura()
     {
-        nudCantidad.Value = 1;
+        Construir.ConfigurarCantidad(nudCantidad, ProductoSeleccionado, ProductoSeleccionado?.Existencia ?? 1);
         cboMotivo.SelectedItem = Merma.MotivoCaducidad;
         txtObservacion.Clear();
         cboProducto.Focus();
@@ -212,6 +213,7 @@ public partial class FormMermas : Form
             dgvMermas.Encabezado("FechaHora", "Fecha");
             dgvMermas.Encabezado("NombreProducto", "Producto");
             dgvMermas.Encabezado("Cantidad", "Cant.");
+            dgvMermas.FormatoColumna("Cantidad", "0.###");
             dgvMermas.Encabezado("Motivo", "Motivo");
             dgvMermas.OcultarColumna("CostoUnitario"); // la pérdida ya lo refleja
             dgvMermas.Encabezado("CostoTotal", "Pérdida");
@@ -222,11 +224,10 @@ public partial class FormMermas : Form
             dgvMermas.Columns["Motivo"]!.FillWeight = 115;
         }
 
-        var unidades = mermas.Sum(m => m.Cantidad);
         var perdida = mermas.Sum(m => m.CostoTotal ?? 0);
         lblTotalPerdida.Text = mermas.Count == 0
             ? "Sin bajas en el período."
-            : $"{mermas.Count} baja(s)  ·  {unidades} unidades  ·  Pérdida: {perdida:C2}";
+            : $"{mermas.Count} baja(s)  ·  Pérdida estimada: {perdida:C2}";
     }
 
     private void MostrarMensaje(string mensaje, bool esError = true)

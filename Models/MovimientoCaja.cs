@@ -12,4 +12,7 @@ public class MovimientoCaja
     public string Tipo { get; set; } = string.Empty; // "Entrada" | "Salida"
     public decimal Monto { get; set; }
     public string? Descripcion { get; set; }
+    public string? NombreUsuario { get; set; }
+
+    [System.ComponentModel.Browsable(false)] public int? IdUsuario { get; set; }
 }

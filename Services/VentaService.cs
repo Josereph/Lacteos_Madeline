@@ -10,50 +10,91 @@ namespace LacteosMadeline.Services;
 /// la venta completa (cabecera + detalle) descontando existencias de
 /// forma atómica. Sigue el flujo descrito en la sección 8 de los
 /// lineamientos: iniciar venta → agregar productos → total → confirmar → ticket.
+/// También anula ventas ya registradas.
 /// </summary>
 public class VentaService
 {
     private readonly ProductoRepository _productoRepository = new();
     private readonly VentaRepository _ventaRepository = new();
     private readonly CajaRepository _cajaRepository = new();
+    private readonly ClienteRepository _clienteRepository = new();
 
     private readonly List<DetalleVenta> _carrito = new();
 
     public IReadOnlyList<DetalleVenta> Carrito => _carrito;
 
-    public decimal Total => _carrito.Sum(d => d.Subtotal);
+    /// <summary>Suma de las líneas, antes del descuento.</summary>
+    public decimal Subtotal => _carrito.Sum(d => d.Subtotal);
+
+    public decimal Descuento { get; private set; }
+
+    /// <summary>Administrador que autorizó el descuento (si quien vende es cajero).</summary>
+    public int? IdUsuarioDescuento { get; private set; }
+
+    /// <summary>Lo que paga el cliente.</summary>
+    public decimal Total => Math.Max(0m, Subtotal - Descuento);
+
+    public Cliente? Cliente { get; private set; }
 
     public void IniciarVenta()
     {
         _carrito.Clear();
+        Descuento = 0m;
+        IdUsuarioDescuento = null;
+        Cliente = null;
     }
 
-    public (bool Exitoso, string Mensaje) AgregarProducto(int idProducto, int cantidad)
+    public (bool Exitoso, string Mensaje) AgregarProducto(int idProducto, decimal cantidad)
     {
-        var validacionCantidad = Validaciones.ValidarCantidad(cantidad);
-        if (!validacionCantidad.EsValido)
-        {
-            return (false, validacionCantidad.Mensaje);
-        }
-
         var producto = _productoRepository.ObtenerPorId(idProducto);
         if (producto is null || !producto.Estado)
         {
             return (false, "El producto seleccionado no está disponible.");
         }
 
+        return Agregar(producto, cantidad);
+    }
+
+    /// <summary>
+    /// Agrega el producto con ese código (lector de código de barras).
+    /// Devuelve false si no hay un producto activo con ese código.
+    /// </summary>
+    public (bool Exitoso, string Mensaje) AgregarPorCodigo(string codigo, decimal cantidad = 1)
+    {
+        if (string.IsNullOrWhiteSpace(codigo))
+        {
+            return (false, "Escriba o escanee un código.");
+        }
+
+        var producto = _productoRepository.ObtenerPorCodigo(codigo);
+        if (producto is null || !producto.Estado)
+        {
+            return (false, $"No hay un producto activo con el código \"{codigo.Trim()}\".");
+        }
+
+        return Agregar(producto, cantidad);
+    }
+
+    private (bool Exitoso, string Mensaje) Agregar(Producto producto, decimal cantidad)
+    {
+        var validacionCantidad = Validaciones.ValidarCantidad(cantidad, producto.Unidad);
+        if (!validacionCantidad.EsValido)
+        {
+            return (false, validacionCantidad.Mensaje);
+        }
+
         var cantidadYaEnCarrito = _carrito
-            .Where(d => d.IdProducto == idProducto)
+            .Where(d => d.IdProducto == producto.IdProducto)
             .Sum(d => d.Cantidad);
 
         var validacionExistencia = Validaciones.ValidarExistenciaSuficiente(
             producto.Existencia, cantidadYaEnCarrito + cantidad);
         if (!validacionExistencia.EsValido)
         {
-            return (false, validacionExistencia.Mensaje);
+            return (false, $"Existencia insuficiente de \"{producto.Nombre}\": hay {Cantidades.Formatear(producto.Existencia, producto.Unidad)}.");
         }
 
-        var lineaExistente = _carrito.FirstOrDefault(d => d.IdProducto == idProducto);
+        var lineaExistente = _carrito.FirstOrDefault(d => d.IdProducto == producto.IdProducto);
         if (lineaExistente is not null)
         {
             lineaExistente.Cantidad += cantidad;
@@ -65,16 +106,90 @@ public class VentaService
                 IdProducto = producto.IdProducto,
                 NombreProducto = producto.Nombre,
                 Cantidad = cantidad,
+                Unidad = producto.Unidad,
                 PrecioUnitario = producto.PrecioVenta
             });
         }
 
-        return (true, string.Empty);
+        AjustarDescuentoAlSubtotal();
+        return (true, $"{Cantidades.Formatear(cantidad, producto.Unidad)} × {producto.Nombre} agregado.");
     }
 
     public void EliminarProducto(int idProducto)
     {
         _carrito.RemoveAll(d => d.IdProducto == idProducto);
+        AjustarDescuentoAlSubtotal();
+    }
+
+    /// <summary>
+    /// Descuento en dinero sobre toda la venta. Si quien vende es cajero,
+    /// <paramref name="idAutoriza"/> debe ser el administrador que lo autorizó.
+    /// </summary>
+    public (bool Exitoso, string Mensaje) AplicarDescuento(decimal monto, int? idAutoriza = null)
+    {
+        if (_carrito.Count == 0)
+        {
+            return (false, "Agregue productos antes de aplicar un descuento.");
+        }
+
+        if (monto < 0 || Dinero.TieneMasDeDosDecimales(monto))
+        {
+            return (false, "El descuento debe ser un monto positivo con hasta dos decimales.");
+        }
+
+        if (monto > Subtotal)
+        {
+            return (false, $"El descuento no puede ser mayor que el subtotal ({Subtotal:C2}).");
+        }
+
+        if (monto > 0 && !Sesion.PuedeHacerAccionDeAdministrador(idAutoriza))
+        {
+            return (false, "Los descuentos requieren la autorización de un administrador.");
+        }
+
+        Descuento = monto;
+        IdUsuarioDescuento = monto > 0 ? idAutoriza ?? Sesion.IdUsuario : null;
+        return (true, monto == 0 ? "Descuento quitado." : $"Descuento de {monto:C2} aplicado.");
+    }
+
+    /// <summary>Descuento como porcentaje del subtotal (redondeado a centavos).</summary>
+    public (bool Exitoso, string Mensaje) AplicarDescuentoPorcentaje(decimal porcentaje, int? idAutoriza = null)
+    {
+        if (porcentaje < 0 || porcentaje > 100)
+        {
+            return (false, "El porcentaje debe estar entre 0 y 100.");
+        }
+
+        return AplicarDescuento(Dinero.Redondear(Subtotal * porcentaje / 100m), idAutoriza);
+    }
+
+    /// <summary>Si se quitan productos, el descuento no puede quedar mayor que el subtotal.</summary>
+    private void AjustarDescuentoAlSubtotal()
+    {
+        if (_carrito.Count == 0 || Descuento > Subtotal)
+        {
+            Descuento = 0m;
+            IdUsuarioDescuento = null;
+        }
+    }
+
+    /// <summary>Asocia la venta a un cliente, o la deja como consumidor final (null).</summary>
+    public (bool Exitoso, string Mensaje) SeleccionarCliente(int? idCliente)
+    {
+        if (idCliente is null)
+        {
+            Cliente = null;
+            return (true, string.Empty);
+        }
+
+        var cliente = _clienteRepository.ObtenerPorId(idCliente.Value);
+        if (cliente is null || !cliente.Estado)
+        {
+            return (false, "El cliente seleccionado no existe o está inactivo.");
+        }
+
+        Cliente = cliente;
+        return (true, string.Empty);
     }
 
     /// <summary>
@@ -104,6 +219,11 @@ public class VentaService
             {
                 return (false, $"La línea \"{linea.NombreProducto}\" tiene cantidad o precio inválido. Elimínela y agréguela de nuevo.", null);
             }
+        }
+
+        if (Descuento > Subtotal)
+        {
+            return (false, "El descuento es mayor que el subtotal. Revíselo antes de cobrar.", null);
         }
 
         var total = Dinero.Redondear(Total);
@@ -136,15 +256,21 @@ public class VentaService
             {
                 FechaHora = DateTime.Now,
                 Total = total,
+                Descuento = Descuento,
                 MetodoPago = metodoPago,
                 MontoRecibido = montoRecibido,
                 Cambio = cambio,
                 IdCaja = caja.IdCaja,
+                IdCliente = Cliente?.IdCliente,
+                NombreCliente = Cliente?.Nombre,
+                IdUsuario = Sesion.IdUsuario,
+                NombreUsuario = Sesion.Actual?.Nombre,
+                IdUsuarioDescuento = IdUsuarioDescuento,
                 Detalles = new List<DetalleVenta>(_carrito)
             };
 
             venta.IdVenta = _ventaRepository.RegistrarVentaCompleta(venta);
-            _carrito.Clear();
+            IniciarVenta();
             return (true, "Venta registrada correctamente.", venta);
         }
         catch (ReglaNegocioException ex)
@@ -172,6 +298,48 @@ public class VentaService
     public bool HayCajaAbierta()
     {
         return _cajaRepository.ObtenerCajaAbierta() is not null;
+    }
+
+    // ── Anulación ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Anula una venta: devuelve las existencias y la saca del arqueo (o,
+    /// si es de una caja ya cerrada y se pagó en efectivo, registra la
+    /// devolución como salida de la caja abierta). Reservado a
+    /// administradores: un cajero necesita la autorización
+    /// (<paramref name="idAutoriza"/>) de uno.
+    /// </summary>
+    public (bool Exitoso, string Mensaje) Anular(int idVenta, string? motivo, int? idAutoriza = null)
+    {
+        if (string.IsNullOrWhiteSpace(motivo) || motivo.Trim().Length < 5)
+        {
+            return (false, "Indique el motivo de la anulación (al menos 5 caracteres).");
+        }
+
+        if (!Sesion.PuedeHacerAccionDeAdministrador(idAutoriza))
+        {
+            return (false, "Anular una venta requiere la autorización de un administrador.");
+        }
+
+        try
+        {
+            _ventaRepository.Anular(idVenta, motivo.Trim(), idAutoriza ?? Sesion.IdUsuario);
+            LogHelper.Info("Anulación de venta", $"Venta #{idVenta} anulada. Motivo: {motivo.Trim()}");
+            return (true, $"Venta #{idVenta} anulada. Las existencias se devolvieron al inventario.");
+        }
+        catch (ReglaNegocioException ex)
+        {
+            return (false, ex.Message);
+        }
+        catch (Exception ex) when (ErroresBaseDatos.EsReglaDeIntegridad(ex))
+        {
+            return (false, ErroresBaseDatos.MensajeAmigable(ex));
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error($"Anular venta #{idVenta}", ex);
+            return (false, $"No se pudo anular la venta. No se guardó ningún cambio.\nDetalle: {ErroresBaseDatos.MensajeAmigable(ex)}");
+        }
     }
 
     // ── Consultas de ventas registradas ─────────────────────────────────

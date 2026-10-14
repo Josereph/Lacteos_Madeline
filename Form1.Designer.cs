@@ -33,8 +33,11 @@ partial class Form1
     private BotonNavegacion btnNavMermas;
     private BotonNavegacion btnNavReportes;
     private BotonNavegacion btnNavProveedores;
+    private BotonNavegacion btnNavVentasRealizadas;
+    private BotonNavegacion btnNavClientes;
+    private BotonNavegacion btnNavAdministracion;
     private Panel panelPieSidebar;
-    private BotonNavegacion btnRespaldo;
+    private BotonNavegacion btnCerrarSesion;
     private BotonNavegacion btnSalir;
 
     // Barra superior
@@ -42,6 +45,7 @@ partial class Form1
     private Label lblModulo;
     private Label lblRuta;
     private FlowLayoutPanel panelIndicadores;
+    private IndicadorEstado indUsuario;
     private IndicadorEstado indCaja;
     private IndicadorEstado indStock;
     private IndicadorEstado indReloj;
@@ -70,13 +74,17 @@ partial class Form1
         btnNavMermas = new BotonNavegacion();
         btnNavReportes = new BotonNavegacion();
         btnNavProveedores = new BotonNavegacion();
+        btnNavVentasRealizadas = new BotonNavegacion();
+        btnNavClientes = new BotonNavegacion();
+        btnNavAdministracion = new BotonNavegacion();
         panelPieSidebar = new Panel();
-        btnRespaldo = new BotonNavegacion();
+        btnCerrarSesion = new BotonNavegacion();
         btnSalir = new BotonNavegacion();
         panelTopbar = new Panel();
         lblModulo = new Label();
         lblRuta = new Label();
         panelIndicadores = new FlowLayoutPanel();
+        indUsuario = new IndicadorEstado();
         indCaja = new IndicadorEstado();
         indStock = new IndicadorEstado();
         indReloj = new IndicadorEstado();
@@ -133,32 +141,36 @@ partial class Form1
         // Navegación (los controles con Dock=Top se apilan en orden inverso)
         panelNavegacion.Dock = DockStyle.Fill;
         panelNavegacion.BackColor = Tema.Carbon;
-        panelNavegacion.Padding = new Padding(0, 8, 0, 0);
+        panelNavegacion.Padding = new Padding(0, 4, 0, 0);
+        panelNavegacion.AutoScroll = true; // por si la pantalla es muy baja
 
         lblSeccionModulos.Dock = DockStyle.Top;
-        lblSeccionModulos.Height = 36;
+        lblSeccionModulos.Height = 28;
         lblSeccionModulos.Padding = new Padding(24, 12, 0, 0);
         lblSeccionModulos.Font = new Font(Tema.Familia, 8.25F, FontStyle.Bold);
         lblSeccionModulos.ForeColor = cremaTenue;
         lblSeccionModulos.Text = "MÓDULOS";
 
-        ConfigurarNav(btnNavVentas,      "Punto de Venta",          Icono.PuntoDeVenta);
-        ConfigurarNav(btnNavProductos,   "Productos e Inventario",  Icono.Productos);
-        ConfigurarNav(btnNavCompras,     "Registro de Compras",     Icono.Compras);
-        ConfigurarNav(btnNavCaja,        "Control de Caja",         Icono.Caja);
-        ConfigurarNav(btnNavMermas,      "Mermas y Bajas",          Icono.Mermas);
-        ConfigurarNav(btnNavReportes,    "Reportes y Consultas",    Icono.Reportes);
-        ConfigurarNav(btnNavProveedores, "Proveedores",             Icono.Proveedores);
+        ConfigurarNav(btnNavVentas,           "Punto de Venta",          Icono.PuntoDeVenta);
+        ConfigurarNav(btnNavVentasRealizadas, "Ventas Realizadas",       Icono.Recibo);
+        ConfigurarNav(btnNavClientes,         "Clientes",                Icono.Cliente);
+        ConfigurarNav(btnNavCaja,             "Control de Caja",         Icono.Caja);
+        ConfigurarNav(btnNavProductos,        "Productos e Inventario",  Icono.Productos);
+        ConfigurarNav(btnNavCompras,          "Registro de Compras",     Icono.Compras);
+        ConfigurarNav(btnNavMermas,           "Mermas y Bajas",          Icono.Mermas);
+        ConfigurarNav(btnNavProveedores,      "Proveedores",             Icono.Proveedores);
+        ConfigurarNav(btnNavReportes,         "Reportes",                Icono.Reportes);
+        ConfigurarNav(btnNavAdministracion,   "Administración",          Icono.Engrane);
 
         panelNavegacion.Controls.AddRange(new Control[]
         {
-            btnNavProveedores, btnNavReportes, btnNavMermas, btnNavCaja,
-            btnNavCompras, btnNavProductos, btnNavVentas, lblSeccionModulos
+            btnNavAdministracion, btnNavReportes, btnNavProveedores, btnNavMermas, btnNavCompras,
+            btnNavProductos, btnNavCaja, btnNavClientes, btnNavVentasRealizadas, btnNavVentas, lblSeccionModulos
         });
 
         // Pie: acciones de sistema delimitadas
         panelPieSidebar.Dock = DockStyle.Bottom;
-        panelPieSidebar.Height = 124;
+        panelPieSidebar.Height = 110;
         panelPieSidebar.BackColor = Tema.Carbon;
         panelPieSidebar.Padding = new Padding(0, 6, 0, 14);
         panelPieSidebar.Paint += (_, e) =>
@@ -167,17 +179,17 @@ partial class Form1
             e.Graphics.DrawLine(linea, 24, 0, panelPieSidebar.Width - 24, 0);
         };
 
-        ConfigurarNav(btnRespaldo, "Respaldo de datos", Icono.Respaldo);
-        btnRespaldo.EsAccionSistema = true;
-        btnRespaldo.Height = 50;
-        btnRespaldo.Click += btnRespaldo_Click;
+        ConfigurarNav(btnCerrarSesion, "Cerrar sesión", Icono.Candado);
+        btnCerrarSesion.EsAccionSistema = true;
+        btnCerrarSesion.Height = 44;
+        btnCerrarSesion.Click += btnCerrarSesion_Click;
 
         ConfigurarNav(btnSalir, "Salir del sistema", Icono.Salir);
         btnSalir.EsAccionSistema = true;
-        btnSalir.Height = 50;
+        btnSalir.Height = 44;
         btnSalir.Click += btnSalir_Click;
 
-        panelPieSidebar.Controls.AddRange(new Control[] { btnSalir, btnRespaldo });
+        panelPieSidebar.Controls.AddRange(new Control[] { btnSalir, btnCerrarSesion });
 
         panelSidebar.Controls.Add(panelNavegacion);
         panelSidebar.Controls.Add(panelPieSidebar);
@@ -213,6 +225,11 @@ partial class Form1
         panelIndicadores.BackColor = Color.White;
         panelIndicadores.Location = new Point(600, 18);
 
+        indUsuario.Icono = Icono.Usuario;
+        indUsuario.Clicable = true;
+        indUsuario.Margin = new Padding(0, 0, 10, 0);
+        indUsuario.Click += (_, _) => CambiarMiPin();
+
         indCaja.MostrarPunto = true;
         indCaja.Clicable = true;
         indCaja.Margin = new Padding(0, 0, 10, 0);
@@ -227,7 +244,7 @@ partial class Form1
         indReloj.Margin = new Padding(0);
         indReloj.Font = new Font(Tema.Familia, 9.75F);
 
-        panelIndicadores.Controls.AddRange(new Control[] { indCaja, indStock, indReloj });
+        panelIndicadores.Controls.AddRange(new Control[] { indUsuario, indCaja, indStock, indReloj });
         panelTopbar.Controls.AddRange(new Control[] { lblRuta, lblModulo, panelIndicadores });
         panelTopbar.Resize += (_, _) => UbicarIndicadores();
         panelIndicadores.SizeChanged += (_, _) => UbicarIndicadores();
@@ -265,7 +282,7 @@ partial class Form1
         boton.Text = texto;
         boton.Icono = icono;
         boton.Dock = DockStyle.Top;
-        boton.Height = 52;
+        boton.Height = 42;
     }
 
     #endregion

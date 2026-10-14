@@ -20,7 +20,58 @@ public partial class FormCaja : Form
         InitializeComponent();
         Tema.Aplicar(this);
         ConfigurarDisenoAdaptable();
+        AgregarBotonCorte();
         Load += FormCaja_Load;
+    }
+
+    /// <summary>
+    /// En el historial, un botón debajo de la tabla imprime el corte de la
+    /// caja seleccionada (cerrada, o corte parcial si está abierta).
+    /// </summary>
+    private void AgregarBotonCorte()
+    {
+        var btnImprimirCorte = new Button
+        {
+            Name = "btnImprimirCorte",
+            Text = "Ver / imprimir corte de la caja seleccionada",
+            Size = new Size(330, 34),
+            Location = new Point(0, 10)
+        };
+        btnImprimirCorte.Click += (_, _) =>
+        {
+            if (dgvHistorial.CurrentRow?.DataBoundItem is Models.Caja caja)
+            {
+                MostrarCorte(caja.IdCaja);
+            }
+            else
+            {
+                MostrarMensaje("Seleccione una caja del historial.");
+            }
+        };
+        Tema.EstilizarBoton(btnImprimirCorte, Tema.RolBoton.Secundario);
+
+        var pie = new Panel { Dock = DockStyle.Bottom, Height = 50 };
+        pie.Controls.Add(btnImprimirCorte);
+        tabHistorial.Controls.Add(pie);
+        dgvHistorial.BringToFront();
+    }
+
+    /// <summary>Muestra el corte de caja y ofrece imprimirlo.</summary>
+    private void MostrarCorte(int idCaja)
+    {
+        var resumen = _cajaService.ObtenerResumen(idCaja);
+        var texto = TicketHelper.GenerarCorteCaja(resumen);
+
+        var respuesta = MessageBox.Show(this, $"{texto}\n¿Desea imprimir el corte?", $"Corte de la caja N.º {idCaja}",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+        if (respuesta != DialogResult.Yes) return;
+
+        var impresion = TicketHelper.ImprimirTexto(texto, $"Corte de caja {idCaja}");
+        if (!impresion.Exitoso)
+        {
+            MessageBox.Show(this, $"No se pudo imprimir el corte.\n\n{impresion.Mensaje}", "Impresión",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void FormCaja_Load(object? sender, EventArgs e)
@@ -155,7 +206,8 @@ public partial class FormCaja : Form
                 $"Efectivo contado: {montoFinal:C2}\n" +
                 $"Diferencia: {diferencia:C2}\n\n" +
                 $"Ventas con tarjeta o transferencia (no están en caja): {r.VentasOtrosMetodos:C2}\n" +
-                $"Total vendido en la jornada: {r.TotalVentas:C2}\n\n" +
+                $"Total vendido en la jornada: {r.TotalVentas:C2}  ({r.NumeroVentas} ventas)\n" +
+                $"Descuentos: {r.TotalDescuentos:C2}  ·  Ventas anuladas: {r.VentasAnuladas}\n\n" +
                 resultado.Mensaje,
                 "Caja cerrada",
                 MessageBoxButtons.OK,
@@ -163,6 +215,7 @@ public partial class FormCaja : Form
 
             RefrescarEstado();
             CargarHistorialCajas();
+            MostrarCorte(r.Caja.IdCaja);
         }
     }
 
@@ -192,6 +245,8 @@ public partial class FormCaja : Form
             dgvMovimientos.Encabezado("Tipo", "Tipo");
             dgvMovimientos.Encabezado("Monto", "Monto");
             dgvMovimientos.Encabezado("Descripcion", "Descripción");
+            dgvMovimientos.Encabezado("NombreUsuario", "Usuario");
+            dgvMovimientos.FormatoColumna("Monto", "C2");
         }
     }
 
@@ -214,6 +269,12 @@ public partial class FormCaja : Form
             dgvHistorial.Encabezado("MontoEsperado", "Monto Esperado");
             dgvHistorial.Encabezado("Diferencia", "Diferencia");
             dgvHistorial.Encabezado("Estado", "Estado");
+            dgvHistorial.Encabezado("NombreUsuarioApertura", "Abrió");
+            dgvHistorial.Encabezado("NombreUsuarioCierre", "Cerró");
+            foreach (var columna in new[] { "MontoInicial", "MontoFinal", "MontoEsperado", "Diferencia" })
+            {
+                dgvHistorial.FormatoColumna(columna, "C2");
+            }
         }
 
         // La lista de movimientos no se muestra en el historial; según el

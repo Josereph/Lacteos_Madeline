@@ -162,7 +162,7 @@ public class VentasTests : PruebaConBaseDatos
         servicio.AgregarProducto(idB, 3);
 
         // Otra operación deja menos crema de la que hay en el carrito.
-        Ejecutar($"UPDATE Productos SET Existencia = 1 WHERE IdProducto = {idB};");
+        Ejecutar($"UPDATE Productos SET Existencia = 1000 WHERE IdProducto = {idB};"); // 1 unidad (milésimas)
 
         var resultado = servicio.ConfirmarVenta(Venta.PagoEfectivo, 50m);
 
@@ -203,7 +203,7 @@ public class VentasTests : PruebaConBaseDatos
 
         Assert.Equal(10, Existencia(idProducto));
         Assert.Equal(20, Contar("Ventas"));
-        var totalVendido = new VentaRepository().ObtenerHistorial().Sum(v => v.Total);
+        var totalVendido = new VentaRepository().ObtenerPorRango(null, null).Sum(v => v.Total);
         Assert.Equal(7.00m, totalVendido);
     }
 

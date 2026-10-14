@@ -71,6 +71,8 @@ public partial class FormConsultaCompras : Form
             dgvCompras.OcultarColumna("IdProveedor");
             dgvCompras.Encabezado("NombreProveedor", "Proveedor");
             dgvCompras.Encabezado("Total", "Total");
+            dgvCompras.FormatoColumna("Total", "C2");
+            dgvCompras.Encabezado("NombreUsuario", "Registró");
             if (dgvCompras.Columns["Detalles"] is { } colDetalles) colDetalles.Visible = false;
         }
 
@@ -93,6 +95,9 @@ public partial class FormConsultaCompras : Form
             dgvDetalle.OcultarColumna("IdDetalleCompra");
             dgvDetalle.OcultarColumna("IdCompra");
             dgvDetalle.OcultarColumna("IdProducto");
+            dgvDetalle.FormatoColumna("Cantidad", "0.###");
+            dgvDetalle.FormatoColumna("CostoUnitario", "C2");
+            dgvDetalle.FormatoColumna("Subtotal", "C2");
             dgvDetalle.Encabezado("NombreProducto", "Producto");
             dgvDetalle.Encabezado("Cantidad", "Cantidad");
             dgvDetalle.Encabezado("CostoUnitario", "Costo Unit.");

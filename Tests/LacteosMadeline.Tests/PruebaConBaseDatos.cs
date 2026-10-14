@@ -26,10 +26,12 @@ public abstract class PruebaConBaseDatos : IDisposable
         Carpeta = Path.Combine(Path.GetTempPath(), "LacteosMadeline.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Carpeta);
         DatabaseConnection.ConfigurarRuta(Path.Combine(Carpeta, "LacteosMadeline.db"));
+        Sesion.Cerrar();
 
         if (inicializar)
         {
             DatabaseInitializer.Inicializar();
+            new ConfiguracionService().Cargar();
         }
     }
 
@@ -48,7 +50,8 @@ public abstract class PruebaConBaseDatos : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    protected static int CrearProducto(string nombre, decimal precioVenta, int existencia, decimal? precioCompra = 1m)
+    protected static int CrearProducto(string nombre, decimal precioVenta, decimal existencia, decimal? precioCompra = 1m,
+        string unidad = UnidadMedida.Unidad, string? codigo = null)
     {
         var resultado = new ProductoService().Registrar(new Producto
         {
@@ -57,7 +60,9 @@ public abstract class PruebaConBaseDatos : IDisposable
             PrecioVenta = precioVenta,
             PrecioCompra = precioCompra,
             Existencia = existencia,
-            StockMinimo = 0
+            StockMinimo = 0,
+            Unidad = unidad,
+            Codigo = codigo
         });
 
         Assert.True(resultado.Exitoso, resultado.Mensaje);
@@ -69,6 +74,14 @@ public abstract class PruebaConBaseDatos : IDisposable
         return new ProveedorRepository().Registrar(new Proveedor { Nombre = nombre, Estado = activo });
     }
 
+    /// <summary>Crea un usuario activo con el PIN 2468 y lo devuelve.</summary>
+    protected static Usuario CrearUsuario(string nombre, string rol, string pin = "2468")
+    {
+        var resultado = new UsuarioService().Crear(nombre, rol, pin, pin);
+        Assert.True(resultado.Exitoso, resultado.Mensaje);
+        return new UsuarioRepository().ObtenerPorId(resultado.IdUsuario)!;
+    }
+
     protected static Caja AbrirCaja(decimal montoInicial = 0m)
     {
         var resultado = new CajaService().AbrirCaja(montoInicial);
@@ -76,7 +89,7 @@ public abstract class PruebaConBaseDatos : IDisposable
         return resultado.CajaAbierta!;
     }
 
-    protected static int Existencia(int idProducto)
+    protected static decimal Existencia(int idProducto)
     {
         return new ProductoRepository().ObtenerPorId(idProducto)!.Existencia;
     }
@@ -105,7 +118,7 @@ public abstract class PruebaConBaseDatos : IDisposable
     /// <summary>
     /// Venta completa de un solo producto, en efectivo exacto.
     /// </summary>
-    protected static (bool Exitoso, string Mensaje, Venta? VentaRegistrada) Vender(int idProducto, int cantidad)
+    protected static (bool Exitoso, string Mensaje, Venta? VentaRegistrada) Vender(int idProducto, decimal cantidad)
     {
         var servicio = new VentaService();
         var agregado = servicio.AgregarProducto(idProducto, cantidad);

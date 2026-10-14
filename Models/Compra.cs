@@ -12,5 +12,8 @@ public class Compra
     public int IdProveedor { get; set; }
     public string NombreProveedor { get; set; } = string.Empty;
     public decimal Total { get; set; }
-    public List<DetalleCompra> Detalles { get; set; } = new();
+    public string? NombreUsuario { get; set; }
+
+    [System.ComponentModel.Browsable(false)] public int? IdUsuario { get; set; }
+    [System.ComponentModel.Browsable(false)] public List<DetalleCompra> Detalles { get; set; } = new();
 }

@@ -37,6 +37,13 @@ partial class FormVentas
 
     private Label lblTotalTitulo;
     private Label lblTotal;
+    private TableLayoutPanel tlpDescuento;
+    private Label lblDescuento;
+    private Button btnDescuento;
+    private Label lblClienteTitulo;
+    private TableLayoutPanel tlpCliente;
+    private ComboBox cboCliente;
+    private Button btnNuevoCliente;
     private Label lblMetodoPago;
     private RadioButton rbEfectivo;
     private RadioButton rbTarjeta;
@@ -72,6 +79,13 @@ partial class FormVentas
         lblDesglose = new Label();
         lblTotalTitulo = new Label();
         lblTotal = new Label();
+        tlpDescuento = new TableLayoutPanel();
+        lblDescuento = new Label();
+        btnDescuento = new Button();
+        lblClienteTitulo = new Label();
+        tlpCliente = new TableLayoutPanel();
+        cboCliente = new ComboBox();
+        btnNuevoCliente = new Button();
         lblMetodoPago = new Label();
         rbEfectivo = new RadioButton();
         rbTarjeta = new RadioButton();
@@ -128,7 +142,7 @@ partial class FormVentas
 
         lblProducto.AutoSize = true;
         lblProducto.Anchor = AnchorStyles.Left;
-        lblProducto.Text = "Producto";
+        lblProducto.Text = "Producto o código";
         lblProducto.Font = fuenteEtiquetaGrande;
 
         // Se puede escribir para buscar el producto por nombre.
@@ -211,7 +225,7 @@ partial class FormVentas
         tlpCobro.Dock = DockStyle.Fill;
         tlpCobro.ColumnCount = 1;
         tlpCobro.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        float[] alturas = { 22, 74, 26, 30, 54, 74, 50, 14, 22, 62, 26 };
+        float[] alturas = { 22, 70, 34, 26, 38, 26, 50, 66, 46, 10, 22, 56, 26 };
         tlpCobro.RowCount = alturas.Length + 1;
         foreach (var alto in alturas) tlpCobro.RowStyles.Add(new RowStyle(SizeType.Absolute, alto));
         tlpCobro.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -226,6 +240,57 @@ partial class FormVentas
         lblTotal.Font = new Font("Segoe UI", 36F, FontStyle.Bold);
         lblTotal.TextAlign = ContentAlignment.MiddleRight;
         lblTotal.Text = "$0.00";
+
+        // Subtotal / descuento
+        tlpDescuento.Dock = DockStyle.Fill;
+        tlpDescuento.Margin = new Padding(0);
+        tlpDescuento.ColumnCount = 2;
+        tlpDescuento.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        tlpDescuento.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130F));
+        tlpDescuento.RowCount = 1;
+        tlpDescuento.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        lblDescuento.Dock = DockStyle.Fill;
+        lblDescuento.TextAlign = ContentAlignment.MiddleLeft;
+        lblDescuento.ForeColor = Color.DimGray;
+
+        btnDescuento.Dock = DockStyle.Fill;
+        btnDescuento.Margin = new Padding(4, 2, 0, 2);
+        btnDescuento.Text = "Descuento (F4)";
+        btnDescuento.Click += btnDescuento_Click;
+
+        tlpDescuento.Controls.Add(lblDescuento, 0, 0);
+        tlpDescuento.Controls.Add(btnDescuento, 1, 0);
+
+        // Cliente
+        lblClienteTitulo.Dock = DockStyle.Fill;
+        lblClienteTitulo.Text = "CLIENTE";
+        lblClienteTitulo.Font = fuenteEtiquetaGrande;
+        lblClienteTitulo.ForeColor = Color.DimGray;
+        lblClienteTitulo.TextAlign = ContentAlignment.BottomLeft;
+
+        tlpCliente.Dock = DockStyle.Fill;
+        tlpCliente.Margin = new Padding(0);
+        tlpCliente.ColumnCount = 2;
+        tlpCliente.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        tlpCliente.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80F));
+        tlpCliente.RowCount = 1;
+        tlpCliente.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        cboCliente.Dock = DockStyle.Fill;
+        cboCliente.Font = new Font("Segoe UI", 11F);
+        cboCliente.DropDownStyle = ComboBoxStyle.DropDown;
+        cboCliente.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+        cboCliente.AutoCompleteSource = AutoCompleteSource.ListItems;
+        cboCliente.Margin = new Padding(0, 4, 4, 0);
+
+        btnNuevoCliente.Dock = DockStyle.Fill;
+        btnNuevoCliente.Margin = new Padding(4, 3, 0, 3);
+        btnNuevoCliente.Text = "Nuevo";
+        btnNuevoCliente.Click += btnNuevoCliente_Click;
+
+        tlpCliente.Controls.Add(cboCliente, 0, 0);
+        tlpCliente.Controls.Add(btnNuevoCliente, 1, 0);
 
         lblMetodoPago.Dock = DockStyle.Fill;
         lblMetodoPago.Text = "MÉTODO DE PAGO";
@@ -282,12 +347,12 @@ partial class FormVentas
         lblAtajos.TextAlign = ContentAlignment.BottomLeft;
         lblAtajos.Font = new Font("Segoe UI", 8.75F);
         lblAtajos.ForeColor = Color.DimGray;
-        lblAtajos.Text = "Escriba el nombre del producto, pulse Tab, indique la cantidad y pulse Enter para agregar.";
+        lblAtajos.Text = "Escanee o escriba el código o el nombre y pulse Enter.  F4 descuento · F12 cobrar · Esc cancelar";
 
-        // Las filas 2 y 7 son espacios de separación entre bloques.
+        // La fila 9 es un espacio de separación entre bloques.
         var filas = new Control[]
         {
-            lblTotalTitulo, lblTotal, new Label { Dock = DockStyle.Fill }, lblMetodoPago, tlpMetodos,
+            lblTotalTitulo, lblTotal, tlpDescuento, lblClienteTitulo, tlpCliente, lblMetodoPago, tlpMetodos,
             btnConfirmar, btnCancelar, new Label { Dock = DockStyle.Fill },
             lblCambioTitulo, lblCambio, lblRecibido, lblAtajos
         };

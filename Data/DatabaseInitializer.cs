@@ -30,6 +30,8 @@ public static class DatabaseInitializer
         new(1, "Estructura base (productos, ventas, compras, caja, mermas, índices y reglas de integridad)", AplicarEstructuraBase),
         new(2, "Montos en centavos enteros", V2DineroEnCentavos.Aplicar),
         new(3, "Registro de ajustes de inventario", V3AjustesInventario.Aplicar),
+        new(4, "Venta por peso (unidades y cantidades con decimales) y códigos de producto", V4UnidadesYCodigos.Aplicar),
+        new(5, "Usuarios, clientes, anulación de ventas, descuentos y configuración", V5UsuariosClientesAnulaciones.Aplicar),
     };
 
     /// <summary>

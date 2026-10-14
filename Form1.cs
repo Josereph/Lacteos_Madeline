@@ -15,7 +15,13 @@ namespace LacteosMadeline;
 /// </summary>
 public partial class Form1 : Form
 {
-    public enum Modulo { PuntoDeVenta, Productos, Compras, Caja, Mermas, Reportes, Proveedores }
+    public enum Modulo
+    {
+        PuntoDeVenta, VentasRealizadas, Clientes, Caja, Productos, Compras, Mermas, Proveedores, Reportes, Administracion
+    }
+
+    /// <summary>Módulos que ve un cajero; el administrador ve todos.</summary>
+    private static readonly Modulo[] ModulosCajero = { Modulo.PuntoDeVenta, Modulo.VentasRealizadas, Modulo.Clientes, Modulo.Caja };
 
     private static readonly CultureInfo Cultura = ConfiguracionNegocio.Cultura;
 
@@ -35,20 +41,30 @@ public partial class Form1 : Form
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool ConfirmarAlSalir { get; set; } = true;
 
+    /// <summary>El usuario pulsó "Cerrar sesión": el programa vuelve a la pantalla de inicio.</summary>
+    public bool CerrarSesionSolicitada { get; private set; }
+
     public Form1()
     {
         InitializeComponent();
 
         _botones = new()
         {
-            [Modulo.PuntoDeVenta] = btnNavVentas,
-            [Modulo.Productos]    = btnNavProductos,
-            [Modulo.Compras]      = btnNavCompras,
-            [Modulo.Caja]         = btnNavCaja,
-            [Modulo.Mermas]       = btnNavMermas,
-            [Modulo.Reportes]     = btnNavReportes,
-            [Modulo.Proveedores]  = btnNavProveedores
+            [Modulo.PuntoDeVenta]     = btnNavVentas,
+            [Modulo.VentasRealizadas] = btnNavVentasRealizadas,
+            [Modulo.Clientes]         = btnNavClientes,
+            [Modulo.Caja]             = btnNavCaja,
+            [Modulo.Productos]        = btnNavProductos,
+            [Modulo.Compras]          = btnNavCompras,
+            [Modulo.Mermas]           = btnNavMermas,
+            [Modulo.Proveedores]      = btnNavProveedores,
+            [Modulo.Reportes]         = btnNavReportes,
+            [Modulo.Administracion]   = btnNavAdministracion
         };
+
+        AplicarPermisos();
+        lblNegocio.Text = ConfiguracionNegocio.NombreNegocio;
+        AjustarFuenteAlAncho(lblNegocio, tamanoMinimo: 10F);
 
         foreach (var (modulo, boton) in _botones)
         {
@@ -72,9 +88,33 @@ public partial class Form1 : Form
 
     public Control? VistaActual => _vistaActual;
 
+    /// <summary>Indica si el usuario de la sesión puede abrir el módulo.</summary>
+    public static bool PuedeAbrir(Modulo modulo) =>
+        Sesion.Actual is null || Sesion.EsAdministrador || ModulosCajero.Contains(modulo);
+
+    /// <summary>
+    /// Muestra solo los módulos del rol y el usuario en la barra superior.
+    /// </summary>
+    private void AplicarPermisos()
+    {
+        foreach (var (modulo, boton) in _botones)
+        {
+            boton.Visible = PuedeAbrir(modulo);
+        }
+
+        indUsuario.Visible = Sesion.Actual is not null;
+        if (Sesion.Actual is { } usuario)
+        {
+            indUsuario.Actualizar($"{usuario.Nombre}  ·  {usuario.Rol}", Tema.Crema, Tema.Carbon, Tema.GrisCalido);
+        }
+
+        btnCerrarSesion.Visible = Sesion.Actual is not null;
+    }
+
     public void Navegar(Modulo modulo)
     {
         if (_moduloActual == modulo && _vistaActual is { IsDisposed: false }) return;
+        if (!PuedeAbrir(modulo)) return;
 
         Cursor = Cursors.WaitCursor;
         panelContent.SuspendLayout();
@@ -85,17 +125,21 @@ public partial class Form1 : Form
             Control vista = modulo switch
             {
                 Modulo.PuntoDeVenta => _formVentas is { IsDisposed: false } ? _formVentas : (_formVentas = new FormVentas()),
+                Modulo.VentasRealizadas => new FormConsultaVentas(),
+                Modulo.Clientes => new FormClientes(),
                 Modulo.Productos => new VistaSecciones(
                     ("Productos", () => new FormProductos()),
                     ("Categorías", () => new FormCategorias())),
-                Modulo.Compras => new FormCompras(),
+                Modulo.Compras => new VistaSecciones(
+                    ("Nueva compra", () => new FormCompras()),
+                    ("Consulta de compras", () => new FormConsultaCompras())),
                 Modulo.Caja => new FormCaja(),
                 Modulo.Mermas => new FormMermas(),
-                Modulo.Reportes => new VistaSecciones(
-                    ("Reportes", () => new FormReportes()),
-                    ("Consulta de ventas", () => new FormConsultaVentas()),
-                    ("Consulta de compras", () => new FormConsultaCompras())),
+                Modulo.Reportes => new FormReportes(),
                 Modulo.Proveedores => new FormProveedores(),
+                Modulo.Administracion => new VistaSecciones(
+                    ("Usuarios", () => new FormUsuarios()),
+                    ("Configuración y respaldos", () => new FormConfiguracion())),
                 _ => throw new ArgumentOutOfRangeException(nameof(modulo))
             };
 
@@ -122,7 +166,8 @@ public partial class Form1 : Form
 
             foreach (var (m, boton) in _botones) boton.Activo = m == modulo;
             lblModulo.Text = _botones[modulo].Text;
-            lblRuta.Text = "Lácteos Madeline  /  " + _botones[modulo].Text;
+            UbicarIndicadores();
+            lblRuta.Text = $"{ConfiguracionNegocio.NombreNegocio}  /  {_botones[modulo].Text}";
 
             ActualizarEstado();
         }
@@ -155,31 +200,63 @@ public partial class Form1 : Form
 
     private void MostrarStockCritico()
     {
+        if (!PuedeAbrir(Modulo.Reportes)) return;
+
         Navegar(Modulo.Reportes);
-        if (_vistaActual is VistaSecciones secciones && secciones.Seccion(0) is FormReportes reportes)
+        if (_vistaActual is FormReportes reportes)
         {
             reportes.MostrarPestana(FormReportes.PestanaBajoStock);
         }
     }
 
+    /// <summary>Reduce la letra de una etiqueta hasta que su texto quepa en su ancho.</summary>
+    private static void AjustarFuenteAlAncho(Label etiqueta, float tamanoMinimo)
+    {
+        var tamano = etiqueta.Font.Size;
+        while (tamano > tamanoMinimo)
+        {
+            using var prueba = new Font(etiqueta.Font.FontFamily, tamano, etiqueta.Font.Style);
+            if (TextRenderer.MeasureText(etiqueta.Text, prueba).Width <= etiqueta.Width) break;
+            tamano -= 0.5F;
+        }
+
+        etiqueta.Font = new Font(etiqueta.Font.FontFamily, tamano, etiqueta.Font.Style);
+    }
+
     // ── Barra superior ──────────────────────────────────────────────────
 
+    /// <summary>
+    /// Ubica los indicadores a la derecha. En pantallas angostas, si
+    /// taparían el título del módulo, se oculta el reloj (Windows ya
+    /// muestra la hora en la barra de tareas).
+    /// </summary>
     private void UbicarIndicadores()
     {
-        panelIndicadores.Location = new Point(
-            panelTopbar.ClientSize.Width - panelIndicadores.Width - 24,
-            (panelTopbar.ClientSize.Height - panelIndicadores.Height) / 2);
+        var limiteTitulo = Math.Max(lblModulo.Right, lblRuta.Right) + 16;
+        var izquierda = panelTopbar.ClientSize.Width - panelIndicadores.Width - 24;
+
+        if (izquierda < limiteTitulo && indReloj.Visible)
+        {
+            indReloj.Visible = false;
+            return; // el cambio de tamaño vuelve a llamar a este método
+        }
+
+        if (!indReloj.Visible && izquierda - indReloj.Width - 10 >= limiteTitulo)
+        {
+            indReloj.Visible = true;
+            return;
+        }
+
+        panelIndicadores.Location = new Point(izquierda, (panelTopbar.ClientSize.Height - panelIndicadores.Height) / 2);
     }
 
     private void ActualizarReloj()
     {
         var ahora = DateTime.Now;
-        // "lunes, 12 de octubre" → "Lunes, 12 de octubre" (solo la primera letra en mayúscula).
-        var texto = ahora.ToString("dddd, d 'de' MMMM", Cultura);
+        // "lun 12 oct" → "Lun 12 oct" (solo la primera letra en mayúscula).
+        var texto = ahora.ToString("ddd d MMM", Cultura).Replace(".", string.Empty);
         var fecha = char.ToUpper(texto[0], Cultura) + texto[1..];
-        indReloj.Actualizar($"{fecha}   {ahora:HH:mm:ss}", Tema.Crema, Tema.Carbon, Tema.GrisCalido);
-        // Ancho fijo para que los segundos no muevan los demás indicadores.
-        indReloj.Width = Math.Max(indReloj.Width, 260);
+        indReloj.Actualizar($"{fecha}   {ahora:HH:mm}", Tema.Crema, Tema.Carbon, Tema.GrisCalido);
     }
 
     /// <summary>
@@ -227,23 +304,29 @@ public partial class Form1 : Form
 
     // ── Acciones de sistema ─────────────────────────────────────────────
 
-    private void btnRespaldo_Click(object? sender, EventArgs e)
+    private void CambiarMiPin()
     {
-        using var dlg = new SaveFileDialog
+        if (Sesion.Actual is null) return;
+
+        using var dialogo = new FormCambiarPin();
+        dialogo.ShowDialog(this);
+    }
+
+    private void btnCerrarSesion_Click(object? sender, EventArgs e)
+    {
+        var mensaje = _formVentas is { IsDisposed: false, TieneVentaEnCurso: true }
+            ? "Hay una venta en curso que no se ha cobrado. Si cierra la sesión, se perderá.\n\n¿Cerrar la sesión?"
+            : $"¿Cerrar la sesión de {Sesion.Actual?.Nombre}?";
+
+        if (MessageBox.Show(this, mensaje, "Cerrar sesión", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2) != DialogResult.Yes)
         {
-            Title = "Guardar respaldo de base de datos",
-            Filter = "Base de datos SQLite (*.db)|*.db",
-            FileName = BackupHelper.GenerarNombreArchivo()
-        };
+            return;
+        }
 
-        if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-        var (exitoso, detalle) = BackupHelper.RealizarBackup(dlg.FileName);
-
-        MessageBox.Show(this, detalle,
-            exitoso ? "Respaldo exitoso" : "Error en respaldo",
-            MessageBoxButtons.OK,
-            exitoso ? MessageBoxIcon.Information : MessageBoxIcon.Error);
+        CerrarSesionSolicitada = true;
+        ConfirmarAlSalir = false;
+        Close();
     }
 
     private void btnSalir_Click(object? sender, EventArgs e)

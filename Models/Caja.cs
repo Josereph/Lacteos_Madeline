@@ -16,7 +16,12 @@ public class Caja
     public decimal? MontoEsperado { get; set; }
     public decimal? Diferencia { get; set; }
     public string Estado { get; set; } = "Abierta"; // "Abierta" | "Cerrada"
-    public List<MovimientoCaja> Movimientos { get; set; } = new();
+    public string? NombreUsuarioApertura { get; set; }
+    public string? NombreUsuarioCierre { get; set; }
+
+    [System.ComponentModel.Browsable(false)] public int? IdUsuarioApertura { get; set; }
+    [System.ComponentModel.Browsable(false)] public int? IdUsuarioCierre { get; set; }
+    [System.ComponentModel.Browsable(false)] public List<MovimientoCaja> Movimientos { get; set; } = new();
 
     /// <summary>
     /// Única fórmula del efectivo esperado en caja, usada tanto en el
@@ -42,4 +47,13 @@ public record TotalesCaja(
     decimal Salidas)
 {
     public decimal SaldoEsperado => Caja.CalcularSaldoEsperado(MontoInicial, VentasEfectivo, Entradas, Salidas);
+
+    /// <summary>Ventas que cuentan en la jornada (sin las anuladas en ella).</summary>
+    public int NumeroVentas { get; init; }
+
+    /// <summary>Ventas anuladas durante la jornada (de esta caja o de anteriores).</summary>
+    public int VentasAnuladas { get; init; }
+
+    /// <summary>Descuentos aplicados en las ventas de la jornada.</summary>
+    public decimal Descuentos { get; init; }
 }

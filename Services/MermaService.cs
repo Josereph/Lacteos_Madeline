@@ -16,12 +16,11 @@ public class MermaService
     private readonly MermaRepository _mermaRepository = new();
 
     public (bool Exitoso, string Mensaje, Merma? MermaRegistrada) Registrar(
-        int idProducto, int cantidad, string motivo, string? observacion)
+        int idProducto, decimal cantidad, string motivo, string? observacion)
     {
-        var valCantidad = Validaciones.ValidarCantidad(cantidad);
-        if (!valCantidad.EsValido)
+        if (cantidad <= 0)
         {
-            return (false, valCantidad.Mensaje, null);
+            return (false, "La cantidad debe ser mayor que cero.", null);
         }
 
         if (!Merma.Motivos.Contains(motivo))
@@ -42,10 +41,17 @@ public class MermaService
                 return (false, "El producto seleccionado no existe.", null);
             }
 
+            var valCantidad = Validaciones.ValidarCantidad(cantidad, producto.Unidad);
+            if (!valCantidad.EsValido)
+            {
+                return (false, valCantidad.Mensaje, null);
+            }
+
             var valExistencia = Validaciones.ValidarExistenciaSuficiente(producto.Existencia, cantidad);
             if (!valExistencia.EsValido)
             {
-                return (false, $"No se pueden dar de baja {cantidad} unidades: solo hay {producto.Existencia} en existencia.", null);
+                return (false, $"No se pueden dar de baja {Cantidades.Formatear(cantidad, producto.Unidad)}: " +
+                               $"solo hay {Cantidades.Formatear(producto.Existencia, producto.Unidad)} en existencia.", null);
             }
 
             var merma = new Merma
@@ -56,11 +62,12 @@ public class MermaService
                 Cantidad       = cantidad,
                 Motivo         = motivo,
                 CostoUnitario  = producto.PrecioCompra,
-                Observacion    = string.IsNullOrWhiteSpace(observacion) ? null : observacion.Trim()
+                Observacion    = string.IsNullOrWhiteSpace(observacion) ? null : observacion.Trim(),
+                IdUsuario      = Sesion.IdUsuario
             };
 
             merma.IdMerma = _mermaRepository.Registrar(merma);
-            return (true, $"Baja registrada: {cantidad} × {producto.Nombre} ({motivo}). Inventario actualizado.", merma);
+            return (true, $"Baja registrada: {Cantidades.Formatear(cantidad, producto.Unidad)} × {producto.Nombre} ({motivo}). Inventario actualizado.", merma);
         }
         catch (ReglaNegocioException ex)
         {

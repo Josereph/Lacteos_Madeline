@@ -23,6 +23,7 @@ partial class FormConsultaVentas
     private DataGridView dgvVentas;
     private Label lblTotalVentas;
     private Button btnReimprimir;
+    private Button btnAnularVenta;
     private Label lblDetalleTitle;
     private DataGridView dgvDetalle;
 
@@ -41,6 +42,7 @@ partial class FormConsultaVentas
         dgvVentas      = new DataGridView();
         lblTotalVentas = new Label();
         btnReimprimir  = new Button();
+        btnAnularVenta = new Button();
         lblDetalleTitle = new Label();
         dgvDetalle     = new DataGridView();
 
@@ -96,15 +98,20 @@ partial class FormConsultaVentas
 
         // Resumen + botón reimprimir
         lblTotalVentas.Location = new Point(12, 293);
-        lblTotalVentas.Size = new Size(500, 18);
+        lblTotalVentas.Size = new Size(340, 18);
         lblTotalVentas.AutoSize = false;
         lblTotalVentas.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
         lblTotalVentas.ForeColor = Color.DarkSlateBlue;
 
-        btnReimprimir.Location = new Point(560, 290);
-        btnReimprimir.Size = new Size(132, 25);
+        btnReimprimir.Location = new Point(506, 287);
+        btnReimprimir.Size = new Size(186, 30);
         btnReimprimir.Text = "Ver / Reimprimir ticket";
         btnReimprimir.Click += btnReimprimir_Click;
+
+        btnAnularVenta.Location = new Point(356, 287);
+        btnAnularVenta.Size = new Size(140, 30);
+        btnAnularVenta.Text = "Anular venta";
+        btnAnularVenta.Click += btnAnularVenta_Click;
 
         // Detalle
         lblDetalleTitle.Text = "Detalle de la venta seleccionada:";
@@ -129,7 +136,7 @@ partial class FormConsultaVentas
         {
             lblTitulo,
             lblDesde, dtpDesde, lblHasta, dtpHasta, lblIdVenta, nudIdVenta, btnBuscar,
-            dgvVentas, lblTotalVentas, btnReimprimir, lblDetalleTitle, dgvDetalle
+            dgvVentas, lblTotalVentas, btnAnularVenta, btnReimprimir, lblDetalleTitle, dgvDetalle
         });
 
         ResumeLayout(false);

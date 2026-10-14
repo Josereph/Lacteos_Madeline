@@ -8,7 +8,7 @@ namespace LacteosMadeline.Forms;
 ///
 /// Roles de botón (según el nombre del control):
 ///   Primario  → Confirmar, Guardar, Registrar, Agregar, Abrir, Generar, Ventas
-///   Peligro   → Cancelar, Eliminar, CerrarCaja
+///   Peligro   → Cancelar, Eliminar, CerrarCaja, Anular
 ///   Secundario→ el resto (Nuevo, Buscar, Imprimir, Salir, …)
 /// </summary>
 public static class Tema
@@ -45,7 +45,7 @@ public static class Tema
         { "Confirmar", "Guardar", "Registrar", "Agregar", "Abrir", "Generar", "btnVentas" };
 
     private static readonly string[] NombresPeligro =
-        { "Cancelar", "Eliminar", "CerrarCaja" };
+        { "Cancelar", "Eliminar", "CerrarCaja", "Anular" };
 
     public static void Aplicar(Form form)
     {

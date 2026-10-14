@@ -1,8 +1,31 @@
 # Lácteos Madeline
 
-Sistema de escritorio para Windows de punto de venta e inventario de un negocio de lácteos: ventas con ticket, control de caja con arqueo, compras a proveedores, mermas, reportes y respaldos automáticos.
+Sistema de escritorio para Windows de punto de venta e inventario de un negocio de lácteos. Está hecho en C# con WinForms (.NET 10) y SQLite. Funciona sin conexión a Internet y guarda los datos en la propia PC.
 
-Está hecho en C# con WinForms (.NET 10) y SQLite. Funciona sin conexión a Internet y guarda los datos en la propia PC.
+## Qué hace
+
+| Módulo | Funciones |
+|---|---|
+| Punto de Venta | Búsqueda por nombre o código de barras, venta por unidad o por peso (1.250 lb), descuentos, cliente opcional, cobro en efectivo con cambio, tarjeta o transferencia, y ticket |
+| Ventas Realizadas | Consulta por fecha o número, reimpresión del ticket y anulación con motivo (devuelve el inventario y cuadra la caja) |
+| Clientes | Catálogo de clientes (nombre, DUI/NIT, teléfono, dirección, correo) |
+| Control de Caja | Apertura, entradas y salidas, arqueo, cierre con diferencia y corte de caja imprimible |
+| Productos e Inventario | Productos con código, unidad de venta, precios y stock mínimo; categorías; ajustes de existencia registrados |
+| Compras | Registro de compras a proveedores (actualiza el costo promedio) y consulta |
+| Mermas | Bajas por caducidad o daño, con valor de la pérdida |
+| Reportes | Ventas, compras, inventario valorizado, bajo stock, caja, más vendidos, utilidad y ajustes, con exportación a Excel |
+| Administración | Usuarios y PIN, datos del negocio para el ticket, respaldo externo (USB/OneDrive), respaldo manual y restauración |
+
+### Usuarios y permisos
+
+Cada persona entra con su nombre y un PIN de 4 a 6 números. El PIN se guarda cifrado. La primera vez que se abre el sistema (base de datos vacía), se pide crear el usuario **administrador**.
+
+| Rol | Puede |
+|---|---|
+| Administrador | Todo |
+| Cajero | Punto de venta, ventas realizadas, clientes y caja. Para anular una venta o aplicar un descuento necesita que un administrador escriba su PIN. |
+
+Cada venta, caja, movimiento, compra, merma, ajuste y anulación registra quién la hizo. Tras 5 PIN incorrectos seguidos, el inicio de sesión se bloquea 30 segundos. Si alguien olvida su PIN, un administrador le asigna otro en Administración → Usuarios.
 
 ## Instalar en una PC
 
@@ -43,11 +66,13 @@ Todo vive en `%LOCALAPPDATA%\LacteosMadeline` (separado del programa, así que r
 
 Los datos son por usuario de Windows. Si hay que usar otra ruta (por ejemplo, para pruebas), defina la variable de entorno `LACTEOS_DB_PATH` con la ruta completa del archivo `.db`.
 
-Para pasar los datos a otra PC, genere un respaldo con el botón **Respaldo de datos** y, con el programa cerrado, copie ese archivo como `LacteosMadeline.db` en la carpeta de datos de la otra PC.
+Para pasar los datos a otra PC, genere un respaldo en **Administración → Configuración y respaldos → Hacer respaldo ahora**, instale el programa en la otra PC y use **Restaurar un respaldo**. Antes de restaurar se guarda una copia de los datos que había.
+
+Para protegerse de una falla del disco, elija en esa misma pantalla una **carpeta de copia externa** (una USB o una carpeta de OneDrive): cada respaldo automático se copiará también ahí.
 
 ## Usar el proyecto como plantilla para otro negocio
 
-1. **Datos del negocio y formato regional**: cambie [Helpers/ConfiguracionNegocio.cs](Helpers/ConfiguracionNegocio.cs). Ahí están el nombre y los datos del ticket, el ancho del papel (32 caracteres para 58 mm; 42 o 48 para 80 mm), la cultura y el símbolo de moneda.
+1. **Datos del negocio**: desde el propio programa, en Administración → Configuración: nombre, dirección, teléfono, NIT y ancho del ticket (32 caracteres para papel de 58 mm; 42 o 48 para 80 mm). Los valores iniciales, la moneda y la cultura están en [Helpers/ConfiguracionNegocio.cs](Helpers/ConfiguracionNegocio.cs).
 2. **Nombre y versión del programa**: en [LacteosMadeline.csproj](LacteosMadeline.csproj) (`Product`, `Company`, `Version`). Suba `Version` en cada entrega: es la que aparece en el nombre del .zip.
 3. **Colores y tipografía**: [Forms/Tema.cs](Forms/Tema.cs).
 4. **Rutas de instalación**: al inicio de [scripts/instalar.ps1](scripts/instalar.ps1).
@@ -70,7 +95,7 @@ dotnet run --project LacteosMadeline.csproj
 | `Services/` | Reglas del negocio y validaciones. Devuelven `(Exitoso, Mensaje, …)` en lugar de lanzar excepciones a la pantalla. |
 | `Repositories/` | Acceso a SQLite. Las operaciones de varios pasos (venta, compra, merma, cierre, ajuste) van en una sola transacción. |
 | `Data/` | Conexión, creación y migraciones de la base (`Data/Migraciones/`). |
-| `Helpers/` | Dinero, fechas, ticket, respaldos, log, configuración del negocio. |
+| `Helpers/` | Dinero, cantidades, fechas, PIN, ticket y corte de caja, respaldos, exportación a Excel, log y configuración. |
 | `Models/` | Clases de datos. |
 | `Tests/` | Pruebas automatizadas (xUnit). |
 | `scripts/` | Instalación y generación del paquete. |
@@ -78,6 +103,9 @@ dotnet run --project LacteosMadeline.csproj
 ### Reglas importantes del código
 
 - **Dinero**: en C# es `decimal`; en la base se guarda en **centavos enteros** (`INTEGER`). Toda lectura o escritura pasa por `Helpers/Dinero.cs`. Los montos que escribe el usuario se leen con `Dinero.TryParse`, que acepta tanto `3.50` como `3,50`.
+- **Cantidades**: en C# son `decimal` con hasta 3 decimales; en la base se guardan en **milésimas enteras** (1.250 lb = 1250), a través de `Helpers/Cantidades.cs`. Los productos con unidad "Unidad" solo admiten cantidades enteras.
+- **Ventas**: no se editan ni se borran (lo impiden triggers): solo se anulan, una vez. Una venta anulada en la misma jornada deja de contar en el arqueo; si es de una jornada anterior y se pagó en efectivo, la devolución se registra como salida de la caja abierta.
+- **Usuario actual**: `Services/Sesion.cs`. Los servicios lo usan para registrar quién hizo cada operación y para exigir un administrador en anulaciones y descuentos.
 - **Fechas**: en la base son texto `yyyy-MM-dd HH:mm:ss` con cultura invariante, siempre a través de `Helpers/Fechas.cs`.
 - **Errores de negocio**: los repositorios lanzan `ReglaNegocioException` (existencia insuficiente, caja cerrada…). Los servicios la convierten en un mensaje para el usuario. No se usa `InvalidOperationException` para esto, porque .NET también la lanza por fallos técnicos.
 - **Existencias**: solo cambian por ventas, compras, mermas o ajustes. Los ajustes quedan registrados en la tabla `AjustesInventario`. Modificar un producto nunca cambia su existencia.
@@ -97,7 +125,9 @@ La versión se guarda en `PRAGMA user_version` y se actualiza al iniciar el prog
 | v1 | Estructura base: productos, ventas, compras, caja, mermas, índices y reglas de integridad |
 | v2 | Montos en centavos enteros |
 | v3 | Registro de ajustes de inventario |
+| v4 | Venta por peso (unidad y cantidades en milésimas) y códigos de producto |
+| v5 | Usuarios, clientes, anulación de ventas, descuentos, costo por venta y configuración |
 
 ### Pruebas automatizadas
 
-Están en `Tests/LacteosMadeline.Tests`. Cada prueba usa su propia base SQLite temporal y nunca toca la base del negocio. Cubren ventas, caja, compras, inventario, mermas, reportes, migraciones, respaldos, reglas de integridad y conversión de montos y fechas con distintas configuraciones regionales. Además, una prueba de humo abre todas las pantallas.
+Están en `Tests/LacteosMadeline.Tests`. Cada prueba usa su propia base SQLite temporal y nunca toca la base del negocio. Cubren ventas (por unidad y por peso), descuentos, anulaciones, caja, compras y costo promedio, utilidad, inventario, mermas, usuarios y PIN, clientes, configuración, reportes, migraciones, respaldos y restauración, exportación a Excel, reglas de integridad y conversión de montos y fechas con distintas configuraciones regionales. Además, unas pruebas de humo abren todas las pantallas y diálogos, como administrador y como cajero.

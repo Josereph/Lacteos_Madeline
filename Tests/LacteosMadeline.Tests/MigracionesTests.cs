@@ -76,7 +76,7 @@ public class MigracionesTests : PruebaConBaseDatos
         DatabaseInitializer.Inicializar();
 
         Assert.Equal(DatabaseInitializer.VersionEsquema, VersionActual());
-        Assert.Equal(7, Escalar<long>("SELECT Existencia FROM Productos WHERE IdProducto = 1;"));
+        Assert.Equal(7000, Escalar<long>("SELECT Existencia FROM Productos WHERE IdProducto = 1;")); // 7 unidades en milésimas (v4)
         Assert.Equal(1, Contar("Ventas"));
         Assert.Equal(1, Contar("DetalleVentas"));
         Assert.Equal("Efectivo", Escalar<string>("SELECT MetodoPago FROM Ventas WHERE IdVenta = 1;"));
@@ -219,11 +219,16 @@ public class MigracionesTests : PruebaConBaseDatos
         Assert.Equal(2700, Escalar<long>("SELECT MontoFinal FROM Cajas WHERE IdCaja = 1;"));
         Assert.Equal("integer", Escalar<string>("SELECT typeof(Total) FROM Ventas WHERE IdVenta = 1;"));
 
+        // v4: cantidades en milésimas; v5: las ventas anteriores toman el costo vigente.
+        Assert.Equal(2000, Escalar<long>("SELECT Cantidad FROM DetalleVentas WHERE IdDetalleVenta = 1;"));
+        Assert.Equal(200, Escalar<long>("SELECT CostoUnitario FROM DetalleVentas WHERE IdDetalleVenta = 1;"));
+        Assert.Equal("Activa", Escalar<string>("SELECT Estado FROM Ventas WHERE IdVenta = 1;"));
+
         // El Id 2 se usó y se eliminó: no debe volver a asignarse.
         Assert.Equal(2, Escalar<long>("SELECT seq FROM sqlite_sequence WHERE name = 'Ventas';"));
 
         // Las reglas de integridad y la caja única siguen activas tras reconstruir las tablas.
-        Assert.Equal(8, Escalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger';"));
+        Assert.Equal(11, Escalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger';"));
         Assert.Equal(1, Escalar<long>("SELECT COUNT(*) FROM sqlite_master WHERE name = 'UX_Cajas_UnaAbierta';"));
         Assert.Equal(0, Escalar<long>("SELECT COUNT(*) FROM pragma_foreign_key_check;"));
         Assert.Equal("ok", Escalar<string>("PRAGMA integrity_check;"));

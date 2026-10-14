@@ -28,7 +28,7 @@ public class CompraRepository
             foreach (var detalle in compra.Detalles)
             {
                 InsertarDetalle(connection, transaction, idCompra, detalle);
-                _productoRepository.AumentarExistencia(connection, transaction, detalle.IdProducto, detalle.Cantidad);
+                _productoRepository.RegistrarEntrada(connection, transaction, detalle.IdProducto, detalle.Cantidad, detalle.CostoUnitario);
             }
 
             transaction.Commit();
@@ -46,13 +46,14 @@ public class CompraRepository
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO Compras (FechaHora, IdProveedor, Total)
-            VALUES ($fechaHora, $idProveedor, $total);
+            INSERT INTO Compras (FechaHora, IdProveedor, Total, IdUsuario)
+            VALUES ($fechaHora, $idProveedor, $total, $idUsuario);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(compra.FechaHora));
         command.Parameters.AddWithValue("$idProveedor", compra.IdProveedor);
         command.Parameters.AddWithValue("$total", Dinero.ACentavos(compra.Total));
+        command.Parameters.AddWithValue("$idUsuario", (object?)compra.IdUsuario ?? DBNull.Value);
 
         return Convert.ToInt32(command.ExecuteScalar());
     }
@@ -68,7 +69,7 @@ public class CompraRepository
         command.Parameters.AddWithValue("$idCompra", idCompra);
         command.Parameters.AddWithValue("$idProducto", detalle.IdProducto);
         command.Parameters.AddWithValue("$nombreProducto", detalle.NombreProducto);
-        command.Parameters.AddWithValue("$cantidad", detalle.Cantidad);
+        command.Parameters.AddWithValue("$cantidad", Cantidades.AMilesimas(detalle.Cantidad));
         command.Parameters.AddWithValue("$costoUnitario", Dinero.ACentavos(detalle.CostoUnitario));
         command.Parameters.AddWithValue("$subtotal", Dinero.ACentavos(detalle.Subtotal));
         command.ExecuteNonQuery();
@@ -83,9 +84,10 @@ public class CompraRepository
         using (var command = connection.CreateCommand())
         {
             command.CommandText = """
-                SELECT c.IdCompra, c.FechaHora, c.IdProveedor, p.Nombre, c.Total
+                SELECT c.IdCompra, c.FechaHora, c.IdProveedor, p.Nombre, c.Total, u.Nombre
                 FROM Compras c
                 INNER JOIN Proveedores p ON p.IdProveedor = c.IdProveedor
+                LEFT JOIN Usuarios u ON u.IdUsuario = c.IdUsuario
                 WHERE c.IdCompra = $id;
                 """;
             command.Parameters.AddWithValue("$id", idCompra);
@@ -99,7 +101,8 @@ public class CompraRepository
                     FechaHora      = Fechas.DesdeBaseDatos(reader.GetString(1)),
                     IdProveedor    = reader.GetInt32(2),
                     NombreProveedor = reader.GetString(3),
-                    Total          = reader.LeerDinero(4)
+                    Total          = reader.LeerDinero(4),
+                    NombreUsuario  = reader.IsDBNull(5) ? null : reader.GetString(5)
                 };
             }
         }
@@ -124,7 +127,7 @@ public class CompraRepository
                     IdCompra        = reader.GetInt32(1),
                     IdProducto      = reader.GetInt32(2),
                     NombreProducto  = reader.GetString(3),
-                    Cantidad        = reader.GetInt32(4),
+                    Cantidad        = reader.LeerCantidad(4),
                     CostoUnitario   = reader.LeerDinero(5)
                 });
             }
@@ -140,9 +143,10 @@ public class CompraRepository
         using var connection = DatabaseConnection.CreateConnection();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT c.IdCompra, c.FechaHora, c.IdProveedor, p.Nombre, c.Total
+            SELECT c.IdCompra, c.FechaHora, c.IdProveedor, p.Nombre, c.Total, u.Nombre
             FROM Compras c
             INNER JOIN Proveedores p ON p.IdProveedor = c.IdProveedor
+            LEFT JOIN Usuarios u ON u.IdUsuario = c.IdUsuario
             WHERE c.FechaHora BETWEEN $desde AND $hasta
             ORDER BY c.IdCompra DESC;
             """;
@@ -157,7 +161,8 @@ public class CompraRepository
                 FechaHora       = Fechas.DesdeBaseDatos(reader.GetString(1)),
                 IdProveedor     = reader.GetInt32(2),
                 NombreProveedor = reader.GetString(3),
-                Total           = reader.LeerDinero(4)
+                Total           = reader.LeerDinero(4),
+                NombreUsuario   = reader.IsDBNull(5) ? null : reader.GetString(5)
             });
         }
 

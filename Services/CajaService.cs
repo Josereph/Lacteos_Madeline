@@ -33,7 +33,7 @@ public class CajaService
                 return (false, "Ya existe una caja abierta. Debe cerrarla antes de abrir una nueva.", null);
             }
 
-            var idCaja = _cajaRepository.AbrirCaja(Dinero.Redondear(montoInicial));
+            var idCaja = _cajaRepository.AbrirCaja(Dinero.Redondear(montoInicial), Sesion.IdUsuario);
             return (true, "Caja abierta correctamente.", _cajaRepository.ObtenerPorId(idCaja));
         }
         catch (SqliteException ex) when (ex.SqliteErrorCode == 19) // UX_Cajas_UnaAbierta
@@ -86,7 +86,8 @@ public class CajaService
                 FechaHora   = DateTime.Now,
                 Tipo        = tipo,
                 Monto       = monto,
-                Descripcion = string.IsNullOrWhiteSpace(descripcion) ? null : descripcion.Trim()
+                Descripcion = string.IsNullOrWhiteSpace(descripcion) ? null : descripcion.Trim(),
+                IdUsuario   = Sesion.IdUsuario
             });
 
             return (true, "Movimiento registrado correctamente.");
@@ -117,6 +118,9 @@ public class CajaService
             TotalEntradas      = totales.Entradas,
             TotalSalidas       = totales.Salidas,
             SaldoEsperado      = totales.SaldoEsperado,
+            NumeroVentas       = totales.NumeroVentas,
+            VentasAnuladas     = totales.VentasAnuladas,
+            TotalDescuentos    = totales.Descuentos,
             Movimientos        = _cajaRepository.ObtenerMovimientos(idCaja)
         };
     }
@@ -139,7 +143,7 @@ public class CajaService
 
         try
         {
-            _cajaRepository.CerrarCaja(idCaja, montoFinal);
+            _cajaRepository.CerrarCaja(idCaja, montoFinal, Sesion.IdUsuario);
         }
         catch (ReglaNegocioException ex)
         {
@@ -176,5 +180,8 @@ public class ResumenCaja
     public decimal TotalEntradas { get; set; }
     public decimal TotalSalidas { get; set; }
     public decimal SaldoEsperado { get; set; }
+    public int NumeroVentas { get; set; }
+    public int VentasAnuladas { get; set; }
+    public decimal TotalDescuentos { get; set; }
     public List<MovimientoCaja> Movimientos { get; set; } = new();
 }

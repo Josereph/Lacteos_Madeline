@@ -27,14 +27,15 @@ public class MermaRepository
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
-                INSERT INTO Mermas (FechaHora, IdProducto, NombreProducto, Cantidad, Motivo, CostoUnitario, Observacion)
-                VALUES ($fechaHora, $idProducto, $nombreProducto, $cantidad, $motivo, $costoUnitario, $observacion);
+                INSERT INTO Mermas (FechaHora, IdProducto, NombreProducto, Cantidad, Motivo, CostoUnitario, Observacion, IdUsuario)
+                VALUES ($fechaHora, $idProducto, $nombreProducto, $cantidad, $motivo, $costoUnitario, $observacion, $idUsuario);
                 SELECT last_insert_rowid();
                 """;
             command.Parameters.AddWithValue("$fechaHora", Fechas.ParaBaseDatos(merma.FechaHora));
             command.Parameters.AddWithValue("$idProducto", merma.IdProducto);
             command.Parameters.AddWithValue("$nombreProducto", merma.NombreProducto);
-            command.Parameters.AddWithValue("$cantidad", merma.Cantidad);
+            command.Parameters.AddWithValue("$cantidad", Cantidades.AMilesimas(merma.Cantidad));
+            command.Parameters.AddWithValue("$idUsuario", (object?)merma.IdUsuario ?? DBNull.Value);
             command.Parameters.AddWithValue("$motivo", merma.Motivo);
             command.Parameters.AddWithValue("$costoUnitario", Dinero.ACentavos(merma.CostoUnitario));
             command.Parameters.AddWithValue("$observacion", (object?)merma.Observacion ?? DBNull.Value);
@@ -84,7 +85,7 @@ public class MermaRepository
             FechaHora      = Fechas.DesdeBaseDatos(reader.GetString(1)),
             IdProducto     = reader.GetInt32(2),
             NombreProducto = reader.GetString(3),
-            Cantidad       = reader.GetInt32(4),
+            Cantidad       = reader.LeerCantidad(4),
             Motivo         = reader.GetString(5),
             CostoUnitario  = reader.LeerDineroONulo(6),
             Observacion    = reader.IsDBNull(7) ? null : reader.GetString(7)

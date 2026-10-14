@@ -29,6 +29,10 @@ partial class FormProductos
     private TextBox txtExistencia;
     private Label lblStockMinimo;
     private TextBox txtStockMinimo;
+    private Label lblUnidad;
+    private ComboBox cboUnidad;
+    private Label lblCodigo;
+    private TextBox txtCodigo;
 
     private Button btnNuevo;
     private Button btnGuardar;
@@ -55,6 +59,10 @@ partial class FormProductos
         txtExistencia = new TextBox();
         lblStockMinimo = new Label();
         txtStockMinimo = new TextBox();
+        lblUnidad = new Label();
+        cboUnidad = new ComboBox();
+        lblCodigo = new Label();
+        txtCodigo = new TextBox();
 
         btnNuevo = new Button();
         btnGuardar = new Button();
@@ -141,6 +149,25 @@ partial class FormProductos
         txtStockMinimo.Location = new Point(120, 352);
         txtStockMinimo.Size = new Size(100, 23);
 
+        // lblUnidad / cboUnidad
+        lblUnidad.AutoSize = true;
+        lblUnidad.Location = new Point(240, 355);
+        lblUnidad.Text = "Se vende por:";
+
+        cboUnidad.Location = new Point(340, 352);
+        cboUnidad.Size = new Size(100, 23);
+        cboUnidad.DropDownStyle = ComboBoxStyle.DropDownList;
+
+        // lblCodigo / txtCodigo
+        lblCodigo.AutoSize = true;
+        lblCodigo.Location = new Point(460, 355);
+        lblCodigo.Text = "Código:";
+
+        txtCodigo.Location = new Point(535, 352);
+        txtCodigo.Size = new Size(150, 23);
+        txtCodigo.MaxLength = 50;
+        txtCodigo.PlaceholderText = "Barras o interno";
+
         // btnNuevo
         btnNuevo.Location = new Point(15, 390);
         btnNuevo.Size = new Size(90, 34);
@@ -183,6 +210,10 @@ partial class FormProductos
         Controls.Add(txtExistencia);
         Controls.Add(lblStockMinimo);
         Controls.Add(txtStockMinimo);
+        Controls.Add(lblUnidad);
+        Controls.Add(cboUnidad);
+        Controls.Add(lblCodigo);
+        Controls.Add(txtCodigo);
         Controls.Add(btnNuevo);
         Controls.Add(btnGuardar);
         Controls.Add(btnActivarDesactivar);

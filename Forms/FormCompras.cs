@@ -21,6 +21,12 @@ public partial class FormCompras : Form
         Tema.Aplicar(this);
         ConfigurarDisenoAdaptable();
         Load += FormCompras_Load;
+        cboProducto.SelectedIndexChanged += (_, _) =>
+            Construir.ConfigurarCantidad(nudCantidad, cboProducto.SelectedItem as Producto);
+        cboProducto.Format += (_, e) =>
+        {
+            if (e.ListItem is Producto p) e.Value = $"{p.Nombre}  ({UnidadMedida.Abreviatura(p.Unidad)})";
+        };
     }
 
     private void FormCompras_Load(object? sender, EventArgs e)
@@ -45,6 +51,7 @@ public partial class FormCompras : Form
         cboProducto.DisplayMember = "Nombre";
         cboProducto.ValueMember = "IdProducto";
         cboProducto.DataSource = productos;
+        Construir.ConfigurarCantidad(nudCantidad, cboProducto.SelectedItem as Producto);
     }
 
     private void btnAgregar_Click(object? sender, EventArgs e)
@@ -61,14 +68,14 @@ public partial class FormCompras : Form
             return;
         }
 
-        var cantidad = (int)nudCantidad.Value;
+        var cantidad = nudCantidad.Value;
 
         var resultado = _compraService.AgregarProducto(idProducto, cantidad, costo);
         MostrarMensaje(resultado.Mensaje, esError: !resultado.Exitoso);
 
         if (resultado.Exitoso)
         {
-            nudCantidad.Value = 1;
+            Construir.ConfigurarCantidad(nudCantidad, cboProducto.SelectedItem as Producto);
             txtCosto.Clear();
             ActualizarDetalle();
         }
@@ -123,6 +130,9 @@ public partial class FormCompras : Form
             dgvDetalle.OcultarColumna("IdProducto");
             dgvDetalle.Encabezado("NombreProducto", "Producto");
             dgvDetalle.Encabezado("Cantidad", "Cantidad");
+            dgvDetalle.FormatoColumna("Cantidad", "0.###");
+            dgvDetalle.FormatoColumna("CostoUnitario", "C2");
+            dgvDetalle.FormatoColumna("Subtotal", "C2");
             dgvDetalle.Encabezado("CostoUnitario", "Costo Unit.");
             dgvDetalle.Encabezado("Subtotal", "Subtotal");
         }

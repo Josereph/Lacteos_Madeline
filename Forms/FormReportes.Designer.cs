@@ -19,6 +19,7 @@ partial class FormReportes
     private DateTimePicker dtpHasta;
     private Button btnGenerar;
     private Button btnImprimir;
+    private Button btnExportar;
     private TabControl tabReportes;
     private TabPage tabVentas;
     private TabPage tabCompras;
@@ -26,6 +27,8 @@ partial class FormReportes
     private TabPage tabBajoStock;
     private TabPage tabCaja;
     private TabPage tabMasVendidos;
+    private TabPage tabUtilidad;
+    private TabPage tabAjustes;
     private DataGridView dgvReporte;
     private Label lblMensaje;
 
@@ -40,6 +43,7 @@ partial class FormReportes
         dtpHasta     = new DateTimePicker();
         btnGenerar   = new Button();
         btnImprimir  = new Button();
+        btnExportar  = new Button();
         tabReportes  = new TabControl();
         tabVentas    = new TabPage();
         tabCompras   = new TabPage();
@@ -47,6 +51,8 @@ partial class FormReportes
         tabBajoStock = new TabPage();
         tabCaja      = new TabPage();
         tabMasVendidos = new TabPage();
+        tabUtilidad  = new TabPage();
+        tabAjustes   = new TabPage();
         dgvReporte   = new DataGridView();
         lblMensaje   = new Label();
 
@@ -84,6 +90,10 @@ partial class FormReportes
         btnImprimir.Size = new Size(90, 27);
         btnImprimir.Text = "Imprimir";
         btnImprimir.Click += btnImprimir_Click;
+        btnExportar.Location = new Point(592, 46);
+        btnExportar.Size = new Size(140, 27);
+        btnExportar.Text = "Exportar a Excel";
+        btnExportar.Click += btnExportar_Click;
 
         // TabControl
         tabVentas.Text    = "Ventas";
@@ -92,10 +102,12 @@ partial class FormReportes
         tabBajoStock.Text = "Bajo Stock";
         tabCaja.Text      = "Caja";
         tabMasVendidos.Text = "Más vendidos";
+        tabUtilidad.Text = "Utilidad";
+        tabAjustes.Text  = "Ajustes de inventario";
 
         tabReportes.Location = new Point(12, 85);
         tabReportes.Size = new Size(760, 35);
-        tabReportes.TabPages.AddRange(new TabPage[] { tabVentas, tabCompras, tabInventario, tabBajoStock, tabCaja, tabMasVendidos });
+        tabReportes.TabPages.AddRange(new TabPage[] { tabVentas, tabCompras, tabInventario, tabBajoStock, tabCaja, tabMasVendidos, tabUtilidad, tabAjustes });
         tabReportes.SelectedIndexChanged += tabReportes_SelectedIndexChanged;
 
         // DataGridView — fuera del TabControl para mantener acceso directo
@@ -120,7 +132,7 @@ partial class FormReportes
         {
             lblTitulo,
             lblDesde, dtpDesde, lblHasta, dtpHasta,
-            btnGenerar, btnImprimir,
+            btnGenerar, btnImprimir, btnExportar,
             tabReportes, dgvReporte, lblMensaje
         });
 

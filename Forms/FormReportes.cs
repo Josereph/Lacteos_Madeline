@@ -73,6 +73,8 @@ public partial class FormReportes : Form
                 case 3: GenerarBajoStock(); break;
                 case 4: GenerarCaja(); break;
                 case 5: GenerarMasVendidos(); break;
+                case 6: GenerarUtilidad(); break;
+                case 7: GenerarAjustes(); break;
             }
         }
         catch (Exception ex)
@@ -89,13 +91,18 @@ public partial class FormReportes : Form
         dgvReporte.DataSource = null;
         dgvReporte.DataSource = datos;
 
-        AjustarColumnas("IdVenta", "# Venta", "FechaHora", "Fecha / Hora",
+        AjustarColumnas("IdVenta", "# Venta", "FechaHora", "Fecha / Hora", "Usuario", "Atendió",
                         "MetodoPago", "Método de pago",
-                        "Total", "Total", "Acumulado", "Acumulado");
+                        "Total", "Total", "Acumulado", "Acumulado (sin anuladas)");
+        FormatoMoneda("Descuento", "Total", "Acumulado");
 
+        var activas = datos.Where(d => d.Estado == Models.Venta.EstadoActiva).ToList();
+        var anuladas = datos.Count - activas.Count;
         MostrarMensaje(
-            $"{datos.Count} venta(s)  |  Total: {datos.Sum(d => d.Total):C2}  |  " +
-            $"Efectivo: {datos.Where(d => d.MetodoPago == Models.Venta.PagoEfectivo).Sum(d => d.Total):C2}",
+            $"{activas.Count} venta(s)  |  Total: {activas.Sum(d => d.Total):C2}  |  " +
+            $"Efectivo: {activas.Where(d => d.MetodoPago == Models.Venta.PagoEfectivo).Sum(d => d.Total):C2}  |  " +
+            $"Descuentos: {activas.Sum(d => d.Descuento):C2}" +
+            (anuladas > 0 ? $"  |  Anuladas: {anuladas} (no suman)" : string.Empty),
             esError: false);
     }
 
@@ -106,8 +113,11 @@ public partial class FormReportes : Form
         dgvReporte.DataSource = datos;
 
         AjustarColumnas("Posicion", "#", "Producto", "Producto",
-                        "UnidadesVendidas", "Unidades vendidas", "TotalVendido", "Total vendido",
+                        "UnidadesVendidas", "Cantidad vendida", "TotalVendido", "Total vendido",
                         "NumeroVentas", "N.º de ventas", "ExistenciaActual", "Existencia actual");
+        FormatoMoneda("TotalVendido");
+        dgvReporte.FormatoColumna("UnidadesVendidas", "0.###");
+        dgvReporte.FormatoColumna("ExistenciaActual", "0.###");
 
         MostrarMensaje(datos.Count == 0
             ? "No hay ventas en el rango de fechas seleccionado."
@@ -128,6 +138,8 @@ public partial class FormReportes : Form
             dgvReporte.OcultarColumna("IdProveedor");
             dgvReporte.Encabezado("NombreProveedor", "Proveedor");
             dgvReporte.Encabezado("Total", "Total");
+            dgvReporte.Encabezado("NombreUsuario", "Registró");
+            FormatoMoneda("Total");
         }
     }
 
@@ -148,6 +160,14 @@ public partial class FormReportes : Form
             dgvReporte.Encabezado("Existencia", "Existencia");
             dgvReporte.Encabezado("StockMinimo", "Stock Mín.");
             dgvReporte.Encabezado("Estado", "Activo");
+            dgvReporte.Encabezado("Codigo", "Código");
+            dgvReporte.Encabezado("Unidad", "Se vende por");
+            FormatoMoneda("PrecioCompra", "PrecioVenta");
+            dgvReporte.FormatoColumna("Existencia", "0.###");
+            dgvReporte.FormatoColumna("StockMinimo", "0.###");
+
+            var valorInventario = datos.Sum(p => (p.PrecioCompra ?? 0) * p.Existencia);
+            MostrarMensaje($"{datos.Count} producto(s) activos  |  Valor del inventario al costo: {valorInventario:C2}", esError: false);
         }
     }
 
@@ -168,6 +188,11 @@ public partial class FormReportes : Form
             dgvReporte.Encabezado("StockMinimo", "Stock Mín.");
             dgvReporte.OcultarColumna("PrecioCompra");
             dgvReporte.OcultarColumna("Estado");
+            dgvReporte.Encabezado("Codigo", "Código");
+            dgvReporte.Encabezado("Unidad", "Se vende por");
+            FormatoMoneda("PrecioVenta");
+            dgvReporte.FormatoColumna("Existencia", "0.###");
+            dgvReporte.FormatoColumna("StockMinimo", "0.###");
         }
     }
 
@@ -190,6 +215,9 @@ public partial class FormReportes : Form
             dgvReporte.Encabezado("MontoEsperado", "Monto Esperado");
             dgvReporte.Encabezado("Diferencia", "Diferencia");
             dgvReporte.Encabezado("Estado", "Estado");
+            dgvReporte.Encabezado("NombreUsuarioApertura", "Abrió");
+            dgvReporte.Encabezado("NombreUsuarioCierre", "Cerró");
+            FormatoMoneda("MontoInicial", "MontoFinal", "MontoEsperado", "Diferencia");
         }
 
         // Mostrar resumen de caja abierta si existe
@@ -254,6 +282,81 @@ public partial class FormReportes : Form
     private void tabReportes_SelectedIndexChanged(object? sender, EventArgs e)
     {
         GenerarReporteActivo();
+    }
+
+    private void GenerarUtilidad()
+    {
+        var desde = dtpDesde.Value.Date;
+        var hasta = dtpHasta.Value.Date;
+        var datos = _reporteService.ReporteUtilidad(desde, hasta);
+        dgvReporte.DataSource = null;
+        dgvReporte.DataSource = datos;
+
+        AjustarColumnas("Unidad", "Unidad", "Cantidad", "Cantidad vendida", "Ventas", "Ventas",
+                        "Costo", "Costo", "Utilidad", "Utilidad bruta", "MargenPorcentaje", "Margen %",
+                        "CostoIncompleto", "Sin costo registrado");
+        FormatoMoneda("Ventas", "Costo", "Utilidad");
+        dgvReporte.FormatoColumna("Cantidad", "0.###");
+
+        var ventas = datos.Sum(d => d.Ventas);
+        var costo = datos.Sum(d => d.Costo);
+        var descuentos = _reporteService.TotalDescuentos(desde, hasta);
+        var neta = ventas - descuentos - costo;
+        var incompletos = datos.Count(d => d.CostoIncompleto);
+
+        MostrarMensaje(
+            $"Ventas: {ventas:C2}  |  Descuentos: -{descuentos:C2}  |  Costo: -{costo:C2}  |  Utilidad: {neta:C2}" +
+            (ventas > 0 ? $" ({Math.Round(neta * 100 / ventas, 1)} %)" : string.Empty) +
+            (incompletos > 0 ? $"  |  {incompletos} producto(s) sin precio de compra: su utilidad aparece mayor" : string.Empty),
+            esError: false);
+    }
+
+    private void GenerarAjustes()
+    {
+        var datos = _reporteService.ReporteAjustes(dtpDesde.Value.Date, dtpHasta.Value.Date);
+        dgvReporte.DataSource = null;
+        dgvReporte.DataSource = datos;
+
+        OcultarColumna("IdAjuste");
+        AjustarColumnas("FechaHora", "Fecha / Hora", "NombreProducto", "Producto",
+                        "ExistenciaAnterior", "Antes", "ExistenciaNueva", "Después",
+                        "Diferencia", "Diferencia", "NombreUsuario", "Usuario");
+        foreach (var columna in new[] { "ExistenciaAnterior", "ExistenciaNueva", "Diferencia" })
+        {
+            dgvReporte.FormatoColumna(columna, "0.###");
+        }
+
+        MostrarMensaje($"{datos.Count} ajuste(s) de inventario en el período.", esError: false);
+    }
+
+    private void FormatoMoneda(params string[] columnas)
+    {
+        foreach (var columna in columnas)
+        {
+            dgvReporte.FormatoColumna(columna, "C2");
+        }
+    }
+
+    private void btnExportar_Click(object? sender, EventArgs e)
+    {
+        if (dgvReporte.Rows.Count == 0)
+        {
+            MostrarMensaje("Genere un reporte con datos antes de exportarlo.");
+            return;
+        }
+
+        var titulo = $"{tabReportes.SelectedTab?.Text ?? "Reporte"} {dtpDesde.Value:dd-MM-yyyy} a {dtpHasta.Value:dd-MM-yyyy}";
+        using var dialogo = new SaveFileDialog
+        {
+            Title = "Exportar reporte a Excel",
+            Filter = "Libro de Excel (*.xlsx)|*.xlsx",
+            FileName = $"{titulo.Replace('/', '-')}.xlsx"
+        };
+
+        if (dialogo.ShowDialog(this) != DialogResult.OK) return;
+
+        var (exitoso, detalle) = Helpers.ExportadorExcel.Exportar(dgvReporte, dialogo.FileName, titulo);
+        MostrarMensaje(detalle, esError: !exitoso);
     }
 
     private void AjustarColumnas(params string[] pares)

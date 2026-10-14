@@ -26,14 +26,8 @@ public class CompraService
         _detalle.Clear();
     }
 
-    public (bool Exitoso, string Mensaje) AgregarProducto(int idProducto, int cantidad, decimal costoUnitario)
+    public (bool Exitoso, string Mensaje) AgregarProducto(int idProducto, decimal cantidad, decimal costoUnitario)
     {
-        var valCantidad = Validaciones.ValidarCantidad(cantidad);
-        if (!valCantidad.EsValido)
-        {
-            return (false, valCantidad.Mensaje);
-        }
-
         var valCosto = Validaciones.ValidarCosto(costoUnitario);
         if (!valCosto.EsValido)
         {
@@ -51,8 +45,15 @@ public class CompraService
             return (false, "El producto seleccionado no existe.");
         }
 
-        // Si el producto ya está en el detalle, se acumula la cantidad
-        var lineaExistente = _detalle.FirstOrDefault(d => d.IdProducto == idProducto);
+        var valCantidad = Validaciones.ValidarCantidad(cantidad, producto.Unidad);
+        if (!valCantidad.EsValido)
+        {
+            return (false, valCantidad.Mensaje);
+        }
+
+        // El mismo producto al mismo costo se acumula en una línea; a otro
+        // costo va en una línea aparte para que el costo promedio sea exacto.
+        var lineaExistente = _detalle.FirstOrDefault(d => d.IdProducto == idProducto && d.CostoUnitario == costoUnitario);
         if (lineaExistente is not null)
         {
             lineaExistente.Cantidad += cantidad;
@@ -103,6 +104,8 @@ public class CompraService
             IdProveedor     = idProveedor,
             NombreProveedor = proveedor.Nombre,
             Total           = Total,
+            IdUsuario       = Sesion.IdUsuario,
+            NombreUsuario   = Sesion.Actual?.Nombre,
             Detalles        = new List<DetalleCompra>(_detalle)
         };
 

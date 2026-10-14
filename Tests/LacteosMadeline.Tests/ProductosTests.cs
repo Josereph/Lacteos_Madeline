@@ -38,8 +38,8 @@ public class ProductosTests : PruebaConBaseDatos
         Assert.True(resultado.Exitoso, resultado.Mensaje);
         Assert.Equal(8, Existencia(idProducto));
         Assert.Equal(1, Contar("AjustesInventario"));
-        Assert.Equal(10, Escalar<long>("SELECT ExistenciaAnterior FROM AjustesInventario;"));
-        Assert.Equal(8, Escalar<long>("SELECT ExistenciaNueva FROM AjustesInventario;"));
+        Assert.Equal(10000, Escalar<long>("SELECT ExistenciaAnterior FROM AjustesInventario;")); // milésimas
+        Assert.Equal(8000, Escalar<long>("SELECT ExistenciaNueva FROM AjustesInventario;"));
         Assert.Equal("Conteo del lunes", Escalar<string>("SELECT Motivo FROM AjustesInventario;"));
         Assert.Equal("Queso fresco", Escalar<string>("SELECT NombreProducto FROM AjustesInventario;"));
     }

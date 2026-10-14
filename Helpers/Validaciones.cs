@@ -27,17 +27,31 @@ public static class Validaciones
         return (true, string.Empty);
     }
 
-    public static (bool EsValido, string Mensaje) ValidarCantidad(int cantidad)
+    /// <summary>
+    /// Cantidad mayor que cero, con hasta 3 decimales si la unidad es de
+    /// peso o volumen, y entera si el producto se vende por unidad.
+    /// </summary>
+    public static (bool EsValido, string Mensaje) ValidarCantidad(decimal cantidad, string unidad = Models.UnidadMedida.Unidad)
     {
         if (cantidad <= 0)
         {
             return (false, "La cantidad debe ser mayor que cero.");
         }
 
+        if (!Models.UnidadMedida.PermiteDecimales(unidad) && cantidad != decimal.Truncate(cantidad))
+        {
+            return (false, "Este producto se vende por unidad: la cantidad debe ser un número entero.");
+        }
+
+        if (Cantidades.TieneDemasiadosDecimales(cantidad))
+        {
+            return (false, $"La cantidad admite como máximo {Cantidades.Decimales} decimales.");
+        }
+
         return (true, string.Empty);
     }
 
-    public static (bool EsValido, string Mensaje) ValidarExistenciaSuficiente(int existenciaDisponible, int cantidadSolicitada)
+    public static (bool EsValido, string Mensaje) ValidarExistenciaSuficiente(decimal existenciaDisponible, decimal cantidadSolicitada)
     {
         if (cantidadSolicitada > existenciaDisponible)
         {

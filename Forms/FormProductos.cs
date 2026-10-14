@@ -21,7 +21,7 @@ public partial class FormProductos : Form
     // Existencia que se mostró al seleccionar el producto. Si el usuario la
     // cambia, se registra un ajuste; si mientras tanto hubo una venta o una
     // compra, el ajuste se rechaza en lugar de borrar ese movimiento.
-    private int _existenciaMostrada;
+    private decimal _existenciaMostrada;
 
     public FormProductos()
     {
@@ -33,6 +33,7 @@ public partial class FormProductos : Form
 
     private void FormProductos_Load(object? sender, EventArgs e)
     {
+        cboUnidad.DataSource = UnidadMedida.Todas.ToList();
         CargarCategorias();
         CargarProductos();
     }
@@ -56,6 +57,12 @@ public partial class FormProductos : Form
         {
             dgvProductos.OcultarColumna("IdCategoria");
             dgvProductos.Encabezado("IdProducto", "#");
+            dgvProductos.Encabezado("Codigo", "Código");
+            dgvProductos.Encabezado("Unidad", "Se vende por");
+            dgvProductos.FormatoColumna("Existencia", "0.###");
+            dgvProductos.FormatoColumna("StockMinimo", "0.###");
+            dgvProductos.FormatoColumna("PrecioCompra", "C2");
+            dgvProductos.FormatoColumna("PrecioVenta", "C2");
             dgvProductos.Encabezado("NombreCategoria", "Categoría");
             dgvProductos.Encabezado("PrecioCompra", "P. Compra");
             dgvProductos.Encabezado("PrecioVenta", "P. Venta");
@@ -83,8 +90,10 @@ public partial class FormProductos : Form
         cboCategoria.SelectedValue = producto.IdCategoria;
         txtPrecioCompra.Text = producto.PrecioCompra is decimal compra ? Dinero.ParaEditar(compra) : string.Empty;
         txtPrecioVenta.Text = Dinero.ParaEditar(producto.PrecioVenta);
-        txtExistencia.Text = producto.Existencia.ToString();
-        txtStockMinimo.Text = producto.StockMinimo.ToString();
+        txtExistencia.Text = Cantidades.ParaEditar(producto.Existencia);
+        txtStockMinimo.Text = Cantidades.ParaEditar(producto.StockMinimo);
+        cboUnidad.SelectedItem = producto.Unidad;
+        txtCodigo.Text = producto.Codigo ?? string.Empty;
     }
 
     private void btnNuevo_Click(object? sender, EventArgs e)
@@ -96,6 +105,8 @@ public partial class FormProductos : Form
         txtPrecioVenta.Clear();
         txtExistencia.Clear();
         txtStockMinimo.Clear();
+        txtCodigo.Clear();
+        cboUnidad.SelectedItem = UnidadMedida.Unidad;
         dgvProductos.ClearSelection();
         txtNombre.Focus();
     }
@@ -125,15 +136,18 @@ public partial class FormProductos : Form
             return;
         }
 
-        if (!int.TryParse(txtExistencia.Text, out var existencia))
+        decimal existencia = 0;
+        if (!string.IsNullOrWhiteSpace(txtExistencia.Text) && !Cantidades.TryParse(txtExistencia.Text, out existencia))
         {
             MostrarMensaje("La existencia ingresada no es válida.");
             return;
         }
 
-        if (!int.TryParse(txtStockMinimo.Text, out var stockMinimo))
+        decimal stockMinimo = 0;
+        if (!string.IsNullOrWhiteSpace(txtStockMinimo.Text) && !Cantidades.TryParse(txtStockMinimo.Text, out stockMinimo))
         {
-            stockMinimo = 0;
+            MostrarMensaje("El stock mínimo ingresado no es válido.");
+            return;
         }
 
         var producto = new Producto
@@ -145,6 +159,8 @@ public partial class FormProductos : Form
             PrecioVenta = precioVenta,
             Existencia = existencia,
             StockMinimo = stockMinimo,
+            Unidad = cboUnidad.SelectedItem as string ?? UnidadMedida.Unidad,
+            Codigo = txtCodigo.Text,
             Estado = true
         };
 
@@ -178,11 +194,11 @@ public partial class FormProductos : Form
     /// Cambiar la existencia de un producto ya registrado es un ajuste de
     /// inventario: se confirma con el usuario y queda registrado con su motivo.
     /// </summary>
-    private (bool Exitoso, string Mensaje) AjustarExistencia(string nombreProducto, int nuevaExistencia)
+    private (bool Exitoso, string Mensaje) AjustarExistencia(string nombreProducto, decimal nuevaExistencia)
     {
         var respuesta = MessageBox.Show(this,
             $"Los datos de \"{nombreProducto}\" se guardaron.\n\n" +
-            $"También cambió la existencia de {_existenciaMostrada} a {nuevaExistencia}. " +
+            $"También cambió la existencia de {Cantidades.ParaEditar(_existenciaMostrada)} a {Cantidades.ParaEditar(nuevaExistencia)}. " +
             "Esto se registrará como un ajuste de inventario.\n\n¿Desea aplicar el ajuste?",
             "Ajuste de inventario", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
 
@@ -234,6 +250,7 @@ public partial class FormProductos : Form
             lblNombre, txtNombre, lblCategoria, cboCategoria,
             lblPrecioCompra, txtPrecioCompra, lblPrecioVenta, txtPrecioVenta,
             lblExistencia, txtExistencia, lblStockMinimo, txtStockMinimo,
+            lblUnidad, cboUnidad, lblCodigo, txtCodigo,
             btnNuevo, btnGuardar, btnActivarDesactivar);
         Diseno.Anclar(Diseno.AbajoAncho, lblMensaje);
     }

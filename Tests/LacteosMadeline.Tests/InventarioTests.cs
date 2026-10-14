@@ -79,9 +79,9 @@ public class InventarioTests : PruebaConBaseDatos
     {
         var idAgotado = CrearProducto("Agotado", 1m, 0);
         var idNormal = CrearProducto("Con existencia", 1m, 50);
-        Ejecutar($"UPDATE Productos SET StockMinimo = 5 WHERE IdProducto IN ({idAgotado}, {idNormal});");
+        Ejecutar($"UPDATE Productos SET StockMinimo = 5000 WHERE IdProducto IN ({idAgotado}, {idNormal});");
         var idBajo = CrearProducto("Bajo", 1m, 3);
-        Ejecutar($"UPDATE Productos SET StockMinimo = 5 WHERE IdProducto = {idBajo};");
+        Ejecutar($"UPDATE Productos SET StockMinimo = 5000 WHERE IdProducto = {idBajo};");
 
         var bajos = new InventarioService().ConsultarBajoStock();
 

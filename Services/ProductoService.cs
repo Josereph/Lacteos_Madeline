@@ -29,6 +29,15 @@ public class ProductoService
             return (false, "La existencia inicial no puede ser negativa.", 0);
         }
 
+        if (producto.Existencia > 0)
+        {
+            var validacionExistencia = Validaciones.ValidarCantidad(producto.Existencia, producto.Unidad);
+            if (!validacionExistencia.EsValido)
+            {
+                return (false, $"Existencia inicial: {validacionExistencia.Mensaje}", 0);
+            }
+        }
+
         try
         {
             var id = _productoRepository.Registrar(producto);
@@ -59,6 +68,17 @@ public class ProductoService
 
         try
         {
+            var actual = _productoRepository.ObtenerPorId(producto.IdProducto);
+            if (actual is null)
+            {
+                return (false, "El producto ya no existe.");
+            }
+
+            if (!UnidadMedida.PermiteDecimales(producto.Unidad) && actual.Existencia != decimal.Truncate(actual.Existencia))
+            {
+                return (false, $"No se puede cambiar a \"{producto.Unidad}\": la existencia actual ({Cantidades.ParaEditar(actual.Existencia)}) tiene decimales. Ajústela primero.");
+            }
+
             _productoRepository.Modificar(producto);
             return (true, "Producto modificado correctamente.");
         }
@@ -92,18 +112,35 @@ public class ProductoService
         return _productoRepository.ObtenerPorId(idProducto);
     }
 
+    /// <summary>Producto con ese código exacto, o null.</summary>
+    public Producto? ObtenerPorCodigo(string codigo)
+    {
+        return string.IsNullOrWhiteSpace(codigo) ? null : _productoRepository.ObtenerPorCodigo(codigo);
+    }
+
     /// <summary>Categorías activas, para asignarlas a un producto.</summary>
     public List<Categoria> CategoriasActivas()
     {
         return _categoriaRepository.ObtenerTodas(incluirInactivas: false);
     }
 
-    private static (bool EsValido, string Mensaje) Validar(Producto producto)
+    private (bool EsValido, string Mensaje) Validar(Producto producto)
     {
         var validacionNombre = Validaciones.ValidarTexto(producto.Nombre, "nombre del producto");
         if (!validacionNombre.EsValido)
         {
             return validacionNombre;
+        }
+
+        if (!UnidadMedida.EsValida(producto.Unidad))
+        {
+            return (false, "Seleccione la unidad de venta del producto.");
+        }
+
+        producto.Codigo = string.IsNullOrWhiteSpace(producto.Codigo) ? null : producto.Codigo.Trim();
+        if (producto.Codigo is not null && _productoRepository.ExisteCodigo(producto.Codigo, producto.IdProducto))
+        {
+            return (false, $"El código \"{producto.Codigo}\" ya pertenece a otro producto.");
         }
 
         if (producto.IdCategoria <= 0)
@@ -131,6 +168,15 @@ public class ProductoService
         if (producto.StockMinimo < 0)
         {
             return (false, "El stock mínimo no puede ser negativo.");
+        }
+
+        if (producto.StockMinimo > 0)
+        {
+            var validacionMinimo = Validaciones.ValidarCantidad(producto.StockMinimo, producto.Unidad);
+            if (!validacionMinimo.EsValido)
+            {
+                return (false, $"Stock mínimo: {validacionMinimo.Mensaje}");
+            }
         }
 
         return (true, string.Empty);

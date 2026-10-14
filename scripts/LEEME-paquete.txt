@@ -12,6 +12,14 @@ Funciona en Windows 10 y Windows 11 de 64 bits.
 Si Windows muestra "Windows protegio su PC", elija "Mas informacion" y
 luego "Ejecutar de todas formas" (el programa no esta firmado digitalmente).
 
+PRIMER USO
+  La primera vez el programa pide crear el usuario administrador
+  (nombre y un PIN de 4 a 6 numeros). Despues, en Administracion >
+  Usuarios, puede crear los usuarios de los cajeros.
+  En Administracion > Configuracion y respaldos escriba los datos del
+  negocio que salen en el ticket y elija una carpeta de copia externa
+  (USB u OneDrive) para los respaldos.
+
 ACTUALIZAR
   Ejecute Instalar.cmd del paquete nuevo. La base de datos, los respaldos
   y el historial se conservan.
@@ -25,7 +33,6 @@ DONDE ESTAN LOS DATOS
   %LOCALAPPDATA%\LacteosMadeline
   (pegue esa ruta en la barra del Explorador de archivos)
 
-  Para pasar los datos a otra PC: en el programa use "Respaldo de datos",
-  copie el archivo .db a la otra PC y reemplace con el
-  %LOCALAPPDATA%\LacteosMadeline\LacteosMadeline.db de esa PC
-  (con el programa cerrado).
+  Para pasar los datos a otra PC: en Administracion > Configuracion y
+  respaldos use "Hacer respaldo ahora", lleve el archivo .db a la otra PC
+  y alli use "Restaurar un respaldo".
